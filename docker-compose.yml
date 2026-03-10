@@ -1,0 +1,27 @@
+services:
+  bot:
+    build:
+      context: .
+      target: bot
+    volumes:
+      - bot-data:/app/data
+      - vault-data:/root/.trading-bot-cgr
+    env_file: .env
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - '3000:3000'
+    volumes:
+      - bot-data:/app/data
+    env_file: .env
+    depends_on:
+      - bot
+    restart: unless-stopped
+
+volumes:
+  bot-data:
+  vault-data:

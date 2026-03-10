@@ -1,0 +1,22 @@
+{
+  "name": "@trading-bot/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "setup": "tsx src/setup-cli.ts"
+  },
+  "dependencies": {
+    "@trading-bot/common": "workspace:*",
+    "@inquirer/prompts": "^7.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  }
+}

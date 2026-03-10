@@ -1,0 +1,23 @@
+{
+  "name": "@trading-bot/hedging-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@trading-bot/common": "workspace:*",
+    "@trading-bot/db": "workspace:*",
+    "@trading-bot/security": "workspace:*",
+    "@nktkas/hyperliquid": "^0.16.0",
+    "viem": "^2.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

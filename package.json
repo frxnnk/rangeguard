@@ -1,0 +1,44 @@
+{
+  "name": "trading-bot-cgr",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Hedging bot for concentrated liquidity pools with Hyperliquid DEX",
+  "scripts": {
+    "dev:bot": "pnpm --filter @trading-bot/bot dev",
+    "dev:dashboard": "pnpm --filter @trading-bot/dashboard dev",
+    "build": "pnpm -r build",
+    "build:bot": "pnpm --filter @trading-bot/bot build",
+    "build:dashboard": "pnpm --filter @trading-bot/dashboard build",
+    "test": "pnpm -r test",
+    "setup-keys": "tsx scripts/setup-keys.ts",
+    "testnet-seed": "tsx scripts/testnet-seed.ts",
+    "db:migrate": "pnpm --filter @trading-bot/db migrate",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "sharp"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.4.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.19.0",
+    "typescript-eslint": "^8.57.0",
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
