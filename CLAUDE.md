@@ -44,6 +44,7 @@ apps/bot                 → Bootstrap, event bus, config loader, graceful shutd
 ## Key Patterns & Conventions
 
 ### Code style
+
 - ESM throughout (`"type": "module"` in all package.json)
 - singleQuote, trailingComma all, printWidth 100
 - TypeScript strict mode
@@ -51,19 +52,24 @@ apps/bot                 → Bootstrap, event bus, config loader, graceful shutd
 - Semantic design tokens: `text-foreground`, `bg-card`, `bg-muted`, `border-border` (never `text-white`, `bg-gray-*`)
 
 ### Runtime
+
 - Bot uses `import.meta.dirname` (Node 22+) for path resolution
 - Dashboard uses `process.cwd()` for DB path (Next.js convention)
 - Bot dev: `node --no-warnings --import tsx src/main.ts` (no watch to avoid MaxListeners)
 - Dashboard: next.config has `extensionAlias` (.js→.ts) + `serverExternalPackages` for better-sqlite3
 
-### Hyperliquid SDK
-- `@nktkas/hyperliquid` uses short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `t` (type), `r` (reduceOnly)
+### Hyperliquid SDK (`@nktkas/hyperliquid` v0.16)
+
+- Short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `t` (type), `r` (reduceOnly)
 - Market orders = IOC limit with 1% slippage
 - Asset resolution: coin names → numeric indices via `meta()` API
 - SL trigger orders: `t: { trigger: { triggerPx, isMarket: true, tpsl: 'sl' } }`, `r: true`
 - Cancel orders: `walletClient.cancel({ cancels: [{ a: assetIndex, o: orderId }] })`
+- Transport: `new HttpTransport({ url: 'https://hyperliquid-testnet.xyz' })` (uses `url`, NOT `isTestnet`)
+- WalletClient: `new WalletClient({ wallet, transport, isTestnet: true })` (`isTestnet` goes HERE, affects EIP-712 chain ID for signing)
 
 ### Architecture decisions
+
 - One HL wallet per pool (perpetuals cancel opposing positions in same wallet)
 - One global profit wallet shared across pools
 - Manual pool config via dashboard (no on-chain LP position reading)
@@ -80,9 +86,11 @@ Private keys are NEVER stored in the DB — only in the encrypted vault file.
 shadcn/ui (new-york style, dark theme), 17 components installed. Config at `packages/dashboard/components.json`.
 
 ### API Routes
+
 `/api/pools`, `/api/wallets`, `/api/hedges`, `/api/hedges/[id]/close`, `/api/trades`, `/api/stats`, `/api/prices`, `/api/pnl`, `/api/bot-status`
 
 ### Adding shadcn/ui components
+
 ```bash
 cd packages/dashboard
 npx shadcn@latest add <component-name>
@@ -91,12 +99,14 @@ npx shadcn@latest add <component-name>
 ## Testing
 
 Vitest workspace config at root. Per-package `vitest.config.ts`.
+
 - Test DB: in-memory SQLite via `createTestDb()` in `packages/db/src/test-utils.ts`
 - 62 tests: db (34), pool-monitor (15), hedging-engine (13)
 
 ## Security
 
 Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
+
 - Encryption: AES-256-GCM
 - KDF: scrypt (N=2^17, r=8, p=1, maxmem=256MB)
 - Keys loaded into memory at startup via KeyManager, cleared on shutdown
@@ -106,5 +116,9 @@ Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
 - All code complete, 62 tests passing, 0 typecheck errors
 - Dashboard fully migrated to shadcn/ui with semantic tokens
 - Docker + CI/CD configured
-- Wallets generated and vault encrypted
-- **Next step**: fund wallets on HL testnet, then test E2E hedge cycle
+- **E2E tested on HL testnet** (2026-03-10): full open→close hedge cycle verified
+  - Hedge open: short 0.0097 ETH @ $2062.9 (IOC filled, 2.4s latency)
+  - Hedge close: range return detected, position closed @ $2072.34, PnL: -$0.09
+  - Stop-loss backup orders placed and cancelled correctly
+  - syncPools live range updates working
+- See [docs/TESTNET_GUIDE.md](docs/TESTNET_GUIDE.md) for step-by-step testing instructions

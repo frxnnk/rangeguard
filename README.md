@@ -19,6 +19,7 @@ pnpm dev:dashboard
 ```
 
 Para el setup completo con precios reales y hedging, ver [Setup](#setup).
+Para una guia E2E paso a paso en testnet, ver [docs/TESTNET_GUIDE.md](docs/TESTNET_GUIDE.md).
 
 ---
 
@@ -48,15 +49,16 @@ Para el setup completo con precios reales y hedging, ver [Setup](#setup).
 
 ## Prerequisitos
 
-| Herramienta | Version minima | Verificar con       |
-| ----------- | -------------- | ------------------- |
-| Node.js     | 20.0.0         | `node -v`           |
-| pnpm        | 9.0.0          | `pnpm -v`           |
-| Git         | cualquiera     | `git --version`     |
+| Herramienta | Version minima | Verificar con   |
+| ----------- | -------------- | --------------- |
+| Node.js     | 20.0.0         | `node -v`       |
+| pnpm        | 9.0.0          | `pnpm -v`       |
+| Git         | cualquiera     | `git --version` |
 
 > **Recomendado**: Node.js 22+ (usa `import.meta.dirname` nativo en el bot).
 
 Si no tenes pnpm:
+
 ```bash
 npm install -g pnpm
 ```
@@ -384,7 +386,7 @@ Next.js 15 + React 19 + TailwindCSS 4 + shadcn/ui. Dark theme. Auto-refresh cada
 | New Pool    | `/pools/new`      | Formulario: chain, pool address, tokens, fee tier, rango, monto, leverage, direccion.                |
 | Edit Pool   | `/pools/:id/edit` | Editar configuracion de un pool existente.                                                           |
 | Wallets     | `/wallets`        | Lista de wallets con balances, tipo, alertas. Form para agregar wallet.                              |
-| Hedges      | `/hedges`         | Posiciones abiertas con PnL no realizado. Boton cierre manual.                                      |
+| Hedges      | `/hedges`         | Posiciones abiertas con PnL no realizado. Boton cierre manual.                                       |
 | History     | `/history`        | Tabla de trades cerrados, PnL realizado, filtro false breakouts (Switch).                            |
 | Settings    | `/settings`       | Configuracion del bot.                                                                               |
 
@@ -539,6 +541,7 @@ pnpm setup-testnet
 ```
 
 El script:
+
 - Genera 2 wallets secp256k1 reales (`pool-eth-arb` + `profit-global`)
 - Encripta las private keys en `~/.trading-bot-cgr/vault.enc`
 - Registra las wallets en la DB con sus direcciones reales
@@ -567,6 +570,7 @@ pnpm setup-keys
 ```
 
 En el CLI interactivo:
+
 1. Agregar wallet con alias `pool-eth-arb` (private key de tu wallet de proteccion)
 2. Agregar wallet con alias `profit-global` (private key de tu wallet de profit)
 3. Registrar las wallets desde el dashboard (Wallets → + Add Wallet)
@@ -575,6 +579,8 @@ En el CLI interactivo:
 #### Que ves en Nivel 3
 
 El bot abre shorts/longs reales en HL testnet cuando el precio sale del rango. Cuando vuelve, los cierra automaticamente. El dashboard muestra hedges activos, PnL, saldos en tiempo real.
+
+> **Guia detallada**: Para un walkthrough paso a paso con troubleshooting, ver [docs/TESTNET_GUIDE.md](docs/TESTNET_GUIDE.md).
 
 ---
 
@@ -624,22 +630,22 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 
 ## Scripts disponibles
 
-| Script                | Descripcion                                                         |
-| --------------------- | ------------------------------------------------------------------- |
-| `pnpm dev:bot`        | Arranca el bot en modo desarrollo                                   |
-| `pnpm dev:dashboard`  | Arranca el dashboard en http://localhost:3000                       |
-| `pnpm build`          | Build de produccion de todos los packages                           |
-| `pnpm build:dashboard`| Build de produccion solo del dashboard                              |
-| `pnpm typecheck`      | Typecheck de todos los packages (tsc --noEmit)                      |
-| `pnpm test`           | Correr todos los tests (62 tests via Vitest)                        |
-| `pnpm lint`           | ESLint en todo el proyecto                                          |
-| `pnpm lint:fix`       | ESLint con auto-fix                                                 |
-| `pnpm format`         | Prettier en todo el proyecto                                        |
-| `pnpm format:check`   | Verificar formato sin modificar                                     |
-| `pnpm testnet-seed`   | Crear DB con datos de prueba (dummy addresses, bueno para Nivel 1)  |
-| `pnpm setup-testnet`  | Genera wallets reales, las guarda en vault y seedea la DB           |
-| `pnpm setup-keys`     | CLI interactivo para gestionar private keys en el vault             |
-| `pnpm db:migrate`     | Correr migraciones de la DB                                         |
+| Script                 | Descripcion                                                        |
+| ---------------------- | ------------------------------------------------------------------ |
+| `pnpm dev:bot`         | Arranca el bot en modo desarrollo                                  |
+| `pnpm dev:dashboard`   | Arranca el dashboard en http://localhost:3000                      |
+| `pnpm build`           | Build de produccion de todos los packages                          |
+| `pnpm build:dashboard` | Build de produccion solo del dashboard                             |
+| `pnpm typecheck`       | Typecheck de todos los packages (tsc --noEmit)                     |
+| `pnpm test`            | Correr todos los tests (62 tests via Vitest)                       |
+| `pnpm lint`            | ESLint en todo el proyecto                                         |
+| `pnpm lint:fix`        | ESLint con auto-fix                                                |
+| `pnpm format`          | Prettier en todo el proyecto                                       |
+| `pnpm format:check`    | Verificar formato sin modificar                                    |
+| `pnpm testnet-seed`    | Crear DB con datos de prueba (dummy addresses, bueno para Nivel 1) |
+| `pnpm setup-testnet`   | Genera wallets reales, las guarda en vault y seedea la DB          |
+| `pnpm setup-keys`      | CLI interactivo para gestionar private keys en el vault            |
+| `pnpm db:migrate`      | Correr migraciones de la DB                                        |
 
 ---
 
@@ -647,11 +653,11 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 
 62 tests via Vitest organizados por package:
 
-| Package        | Tests | Cobertura                                              |
-| -------------- | ----- | ------------------------------------------------------ |
-| db             | 34    | pools.repo (12), wallets.repo (11), hedges.repo (11)   |
-| pool-monitor   | 15    | range-detector state machine (15 edge cases)           |
-| hedging-engine | 13    | hedge-calculator validations                           |
+| Package        | Tests | Cobertura                                            |
+| -------------- | ----- | ---------------------------------------------------- |
+| db             | 34    | pools.repo (12), wallets.repo (11), hedges.repo (11) |
+| pool-monitor   | 15    | range-detector state machine (15 edge cases)         |
+| hedging-engine | 13    | hedge-calculator validations                         |
 
 ```bash
 pnpm test            # Correr todos los tests
