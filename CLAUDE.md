@@ -1,69 +1,110 @@
 # CLAUDE.md - Trading Bot CGR
 
-## Project Overview
+## What is this project?
 
-Monorepo TypeScript para hedgear impermanent loss en pools Uniswap V3 usando perpetuos en Hyperliquid DEX. Cuando el precio sale del rango → abre hedge. Cuando vuelve → cierra.
+Monorepo TypeScript para hedgear impermanent loss en pools Uniswap V3 usando perpetuos en Hyperliquid DEX. Cuando el precio sale del rango configurado, abre hedge automaticamente. Cuando vuelve, cierra y registra PnL.
 
-## Commands
+## Quick Reference
 
 ```bash
-pnpm dev:bot           # Bot (tsx, no watch)
-pnpm dev:dashboard     # Dashboard Next.js en :3000
-pnpm test              # 62 tests via Vitest
-pnpm typecheck         # tsc --noEmit en 7 packages
-pnpm lint              # ESLint (0 errors, ~28 warnings)
-pnpm format            # Prettier
-pnpm build:dashboard   # Next.js production build
-pnpm setup-testnet     # Genera wallets + vault + DB seed
-pnpm setup-keys        # CLI interactivo para private keys
+# Development
+pnpm install                # Install all dependencies
+pnpm dev:bot                # Start bot (tsx, no watch)
+pnpm dev:dashboard          # Start Next.js dashboard on :3000
+
+# Quality checks (run all before committing)
+pnpm test                   # 62 tests via Vitest
+pnpm typecheck              # tsc --noEmit across 7 packages
+pnpm lint                   # ESLint (0 errors, ~28 warnings expected)
+pnpm format:check           # Prettier check
+
+# Setup
+pnpm testnet-seed           # Seed DB with dummy data (quick start)
+pnpm setup-testnet          # Generate real wallets + vault + DB seed
+pnpm setup-keys             # Interactive CLI for vault key management
+
+# Build
+pnpm build                  # Build all packages
+pnpm build:dashboard        # Next.js production build
+docker compose up -d        # Docker (bot + dashboard)
 ```
 
-## Architecture
+## Package Structure
 
-- `packages/common` - Types, constants (chains/pairs/ABIs), utils
-- `packages/db` - SQLite (better-sqlite3, WAL), 6 tables, repository pattern
-- `packages/security` - AES-256-GCM vault for private keys, scrypt KDF
-- `packages/pool-monitor` - viem multi-chain, Swap WS + slot0 polling, range detector
-- `packages/hedging-engine` - @nktkas/hyperliquid SDK, hedge calc, order executor
-- `packages/dashboard` - Next.js 15, React 19, Tailwind 4, shadcn/ui, TanStack Query
-- `apps/bot` - Bootstrap, event bus, config, graceful shutdown
+```
+packages/common          → Types, constants (chains/pairs/ABIs), utils (logger, tick-math, retry)
+packages/db              → SQLite (better-sqlite3, WAL), 6 tables, repository pattern
+packages/security        → AES-256-GCM vault for N wallet private keys, scrypt KDF
+packages/pool-monitor    → viem multi-chain clients, Swap event WS + slot0 polling, range detector
+packages/hedging-engine  → @nktkas/hyperliquid SDK, hedge calculator, order executor, wallet monitor
+packages/dashboard       → Next.js 15 App Router, TanStack Query, Recharts, shadcn/ui (dark theme)
+apps/bot                 → Bootstrap, event bus, config loader, graceful shutdown
+```
 
-## Key Patterns
+## Key Patterns & Conventions
 
+### Code style
 - ESM throughout (`"type": "module"` in all package.json)
+- singleQuote, trailingComma all, printWidth 100
+- TypeScript strict mode
+- shadcn/ui components in `packages/dashboard/src/components/ui/`
+- Semantic design tokens: `text-foreground`, `bg-card`, `bg-muted`, `border-border` (never `text-white`, `bg-gray-*`)
+
+### Runtime
 - Bot uses `import.meta.dirname` (Node 22+) for path resolution
-- Dashboard uses `process.cwd()` for DB path
-- HL SDK uses short field names: `a` (asset), `b` (isBuy), `p` (price), `s` (size)
-- Range detector: debounce 3 consecutive + cooldown post-close
-- Market orders = IOC limit with 1% slippage on HL
-- One HL wallet per pool, one global profit wallet
+- Dashboard uses `process.cwd()` for DB path (Next.js convention)
+- Bot dev: `node --no-warnings --import tsx src/main.ts` (no watch to avoid MaxListeners)
+- Dashboard: next.config has `extensionAlias` (.js→.ts) + `serverExternalPackages` for better-sqlite3
+
+### Hyperliquid SDK
+- `@nktkas/hyperliquid` uses short field names: `a` (asset index), `b` (isBuy), `p` (price), `s` (size), `t` (type), `r` (reduceOnly)
+- Market orders = IOC limit with 1% slippage
+- Asset resolution: coin names → numeric indices via `meta()` API
+- SL trigger orders: `t: { trigger: { triggerPx, isMarket: true, tpsl: 'sl' } }`, `r: true`
+- Cancel orders: `walletClient.cancel({ cancels: [{ a: assetIndex, o: orderId }] })`
+
+### Architecture decisions
+- One HL wallet per pool (perpetuals cancel opposing positions in same wallet)
+- One global profit wallet shared across pools
+- Manual pool config via dashboard (no on-chain LP position reading)
+- Range detector: debounce 3 consecutive updates + cooldown post-close
 
 ## Database
 
 SQLite WAL at `data/bot.db`. Tables: `wallets`, `pool_configs`, `hedge_trades`, `trade_log`, `pnl_snapshots`, `price_cache`.
 
+Private keys are NEVER stored in the DB — only in the encrypted vault file.
+
 ## Dashboard
 
-shadcn/ui (new-york, dark theme), 17 components. API routes at `/api/pools`, `/api/wallets`, `/api/hedges`, `/api/trades`, `/api/stats`, `/api/prices`, `/api/pnl`, `/api/bot-status`.
+shadcn/ui (new-york style, dark theme), 17 components installed. Config at `packages/dashboard/components.json`.
 
-Config: `packages/dashboard/components.json`, `cn()` at `src/lib/utils.ts`.
+### API Routes
+`/api/pools`, `/api/wallets`, `/api/hedges`, `/api/hedges/[id]/close`, `/api/trades`, `/api/stats`, `/api/prices`, `/api/pnl`, `/api/bot-status`
+
+### Adding shadcn/ui components
+```bash
+cd packages/dashboard
+npx shadcn@latest add <component-name>
+```
 
 ## Testing
 
-Vitest workspace config. Test DB: in-memory SQLite via `createTestDb()` in `packages/db/src/test-utils.ts`.
-
-## Infrastructure
-
-- Docker: multi-stage Dockerfile (targets: bot, dashboard), docker-compose with shared volume
-- CI: `.github/workflows/ci.yml` (Node 22, pnpm 9)
-- ESLint flat config + Prettier
+Vitest workspace config at root. Per-package `vitest.config.ts`.
+- Test DB: in-memory SQLite via `createTestDb()` in `packages/db/src/test-utils.ts`
+- 62 tests: db (34), pool-monitor (15), hedging-engine (13)
 
 ## Security
 
-Private keys stored in `~/.trading-bot-cgr/vault.enc` (AES-256-GCM, scrypt N=2^17). Never in DB or .env.
+Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
+- Encryption: AES-256-GCM
+- KDF: scrypt (N=2^17, r=8, p=1, maxmem=256MB)
+- Keys loaded into memory at startup via KeyManager, cleared on shutdown
 
 ## Current Status
 
 - All code complete, 62 tests passing, 0 typecheck errors
-- Dashboard fully migrated to shadcn/ui
-- Pending: fund wallets on HL testnet for real E2E testing
+- Dashboard fully migrated to shadcn/ui with semantic tokens
+- Docker + CI/CD configured
+- Wallets generated and vault encrypted
+- **Next step**: fund wallets on HL testnet, then test E2E hedge cycle
