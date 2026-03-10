@@ -35,7 +35,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/common/node_modules ./packages/common/node_modules
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
-COPY --from=dashboard-build /app/packages/dashboard/public ./packages/dashboard/public
 COPY . .
 ENV NODE_ENV=production
 EXPOSE 3000

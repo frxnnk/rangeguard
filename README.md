@@ -651,6 +651,8 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 
 ## Testing
 
+### Unit Tests
+
 62 tests via Vitest organizados por package:
 
 | Package        | Tests | Cobertura                                            |
@@ -667,6 +669,48 @@ pnpm -r test         # Lo mismo, recursive
 Test utilities: `packages/db/src/test-utils.ts` provee `createTestDb()` con SQLite in-memory para tests rapidos sin tocar disco.
 
 Cada package tiene su propio `vitest.config.ts`, coordinados por `vitest.workspace.ts` en la raiz.
+
+### E2E Testnet (verificado 2026-03-10)
+
+Ciclo completo de hedge open → close probado en Hyperliquid testnet:
+
+| Paso                   | Resultado                                                    |
+| ---------------------- | ------------------------------------------------------------ |
+| Bot startup            | Carga vault (2 keys), inicializa HL wallets, registra 1 pool |
+| Precio polling         | slot0 cada 5s, precio real ETH/USDC on-chain ($2071)         |
+| Range exit detection   | Debounce 3 polls → `out-of-range-below` confirmado           |
+| Hedge open             | Short 0.0097 ETH @ $2062.9, IOC filled en 2.4s               |
+| Stop-loss backup       | Trigger order colocado @ $2244                               |
+| syncPools range update | Detecta cambio de rango en DB en ~30s                        |
+| Range return detection | Debounce 3 polls → `in-range` confirmado                     |
+| Hedge close            | Posicion cerrada @ $2072.34, PnL: -$0.09                     |
+| DB verification        | `status=closed`, `close_reason=range_return`, PnL registrado |
+| Manual close via API   | `POST /api/hedges/[id]/close` → cierra hedge y calcula PnL   |
+
+### API Endpoints (todos verificados)
+
+```
+GET  /api/stats              ✓  Overview stats
+GET  /api/pools              ✓  Lista pools
+POST /api/pools              ✓  Crear pool
+GET  /api/pools/:id          ✓  Pool individual
+PUT  /api/pools/:id          ✓  Actualizar pool
+POST /api/pools/:id/toggle   ✓  Toggle proteccion
+GET  /api/wallets            ✓  Lista wallets
+POST /api/wallets            ✓  Crear wallet
+GET  /api/hedges             ✓  Hedges abiertos
+POST /api/hedges/:id/close   ✓  Cerrar hedge manual
+GET  /api/trades             ✓  Historial trades
+GET  /api/prices?asset=ETH   ✓  Precios cacheados
+GET  /api/pnl                ✓  Snapshots PnL
+GET  /api/bot-status         ✓  Heartbeat bot
+```
+
+### Dashboard Pages (todas renderizan HTTP 200)
+
+`/`, `/pools`, `/pools/:id`, `/pools/new`, `/wallets`, `/hedges`, `/history`, `/settings`
+
+Para la guia completa de testing en testnet: [docs/TESTNET_GUIDE.md](docs/TESTNET_GUIDE.md)
 
 ---
 
