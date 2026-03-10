@@ -237,7 +237,8 @@ trading-bot-cgr/
 │
 ├── scripts/
 │   ├── setup-keys.ts                 # CLI para agregar/listar/borrar private keys
-│   └── testnet-seed.ts               # Seed de datos de prueba (idempotente)
+│   ├── setup-testnet.ts              # Setup automatico: genera keys + vault + DB seed
+│   └── testnet-seed.ts               # Seed de datos de prueba (dummy addresses)
 │
 ├── .env.example                      # Template de variables de entorno
 ├── pnpm-workspace.yaml               # packages/* + apps/*
@@ -482,30 +483,44 @@ Que ves: el bot lee el precio real de ETH/USDC del pool en Arbitrum. El dashboar
 
 ### Nivel 3 — E2E con Hyperliquid testnet
 
-Necesitas: wallets con fondos en HL testnet.
-
-1. Ir a https://app.hyperliquid-testnet.xyz
-2. Conectar wallet o crear una nueva
-3. Pedir USDC del faucet testnet
-4. Necesitas al menos 2 wallets: una de proteccion y una de profit
-5. Anotar las private keys
+#### Opcion A: Setup automatico (recomendado)
 
 ```bash
-# Agregar a .env
-VAULT_PASSWORD=una-contraseña-segura
+# 1. Crear .env (copiar de .env.example y setear VAULT_PASSWORD)
+cp .env.example .env
+# Editar .env: setear VAULT_PASSWORD=una-contraseña-segura
 
-# Correr el CLI interactivo para guardar las keys
+# 2. Generar wallets, guardar en vault y seedear DB automaticamente
+pnpm setup-testnet
+```
+
+El script genera 2 wallets (pool-eth-arb + profit-global), las encripta en el vault y registra en la DB con direcciones reales. Muestra las private keys para importar en MetaMask/Phantom.
+
+```bash
+# 3. Importar las private keys en MetaMask
+# 4. Ir a https://app.hyperliquid-testnet.xyz
+# 5. Depositar USDC del faucet en cada wallet
+# 6. Correr bot + dashboard
+pnpm dev:bot           # Terminal 1
+pnpm dev:dashboard     # Terminal 2
+```
+
+#### Opcion B: Setup manual
+
+```bash
+# Setear VAULT_PASSWORD en .env
+# Correr el CLI interactivo
 pnpm setup-keys
 ```
 
 En el CLI:
+- Agregar wallet con alias `pool-eth-arb` (private key de tu wallet de proteccion)
+- Agregar wallet con alias `profit-global` (private key de tu wallet de profit)
+- Registrar las wallets desde el dashboard (Wallets → + Add Wallet)
 
-- Agregar wallet con alias `pool-eth-arb` (private key de wallet 1)
-- Agregar wallet con alias `profit-global` (private key de wallet 2)
+#### Que ves en Nivel 3
 
-Luego actualizar las direcciones de las wallets en el dashboard (las del seed son `0x000...001`, hay que poner las reales).
-
-Que ves: el bot abre shorts/longs reales en HL testnet cuando el precio sale del rango. Cuando vuelve, los cierra automaticamente. El dashboard muestra hedges activos, PnL, saldos.
+El bot abre shorts/longs reales en HL testnet cuando el precio sale del rango. Cuando vuelve, los cierra automaticamente. El dashboard muestra hedges activos, PnL, saldos.
 
 ---
 
@@ -545,16 +560,19 @@ DB_PATH=C:/temp/trading-bot/bot.db
 
 ### Scripts disponibles
 
-| Script               | Descripcion                                   |
-| -------------------- | --------------------------------------------- |
-| `pnpm dev:bot`       | Arranca el bot en modo desarrollo (tsx watch) |
-| `pnpm dev:dashboard` | Arranca el dashboard en http://localhost:3000 |
-| `pnpm build`         | Build de produccion de todos los packages     |
-| `pnpm typecheck`     | Typecheck de todos los packages               |
-| `pnpm test`          | Correr tests de todos los packages            |
-| `pnpm testnet-seed`  | Crear DB con datos de prueba (idempotente)    |
-| `pnpm setup-keys`    | CLI interactivo para gestionar private keys   |
-| `pnpm db:migrate`    | Correr migraciones de la DB                   |
+| Script                | Descripcion                                                         |
+| --------------------- | ------------------------------------------------------------------- |
+| `pnpm dev:bot`        | Arranca el bot en modo desarrollo                                   |
+| `pnpm dev:dashboard`  | Arranca el dashboard en http://localhost:3000                       |
+| `pnpm build`          | Build de produccion de todos los packages                           |
+| `pnpm typecheck`      | Typecheck de todos los packages                                     |
+| `pnpm test`           | Correr tests de todos los packages                                  |
+| `pnpm lint`           | ESLint en todo el proyecto                                          |
+| `pnpm format`         | Prettier en todo el proyecto                                        |
+| `pnpm testnet-seed`   | Crear DB con datos de prueba (dummy addresses)                      |
+| `pnpm setup-testnet`  | Genera wallets reales, las guarda en vault y seedea la DB           |
+| `pnpm setup-keys`     | CLI interactivo para gestionar private keys en el vault             |
+| `pnpm db:migrate`     | Correr migraciones de la DB                                         |
 
 ---
 
@@ -588,6 +606,85 @@ DB_PATH=C:/temp/trading-bot/bot.db
 | Dashboard       | Next.js 15, React 19, TailwindCSS 4  |
 | Estado client   | TanStack Query (auto-refetch 5s)     |
 | Graficos        | Recharts                             |
+| UI Components   | shadcn/ui (17 componentes)           |
 | Logging         | pino + pino-pretty                   |
 | Seguridad       | AES-256-GCM + scrypt KDF             |
+| Testing         | Vitest (62 tests)                    |
+| Linting         | ESLint + Prettier                    |
+| CI/CD           | GitHub Actions                       |
+| Containerizacion| Docker multi-stage                   |
 | CLI             | @inquirer/prompts                    |
+
+---
+
+## Testing
+
+62 tests via Vitest organizados por package:
+
+| Package        | Tests | Cobertura                                              |
+| -------------- | ----- | ------------------------------------------------------ |
+| db             | 34    | pools.repo (12), wallets.repo (11), hedges.repo (11)   |
+| pool-monitor   | 15    | range-detector state machine                           |
+| hedging-engine | 13    | hedge-calculator validations                           |
+
+```bash
+pnpm test            # Correr todos los tests
+pnpm -r test         # Lo mismo, recursive
+```
+
+Test utilities: `packages/db/src/test-utils.ts` provee `createTestDb()` con SQLite in-memory.
+
+---
+
+## Calidad de codigo
+
+- **ESLint**: Flat config (`eslint.config.js`), typescript-eslint + prettier compat. 0 errores.
+- **Prettier**: singleQuote, trailingComma all, printWidth 100.
+- **Typecheck**: `tsc --noEmit` en todos los packages. 0 errores.
+
+```bash
+pnpm typecheck       # Typecheck todos los packages
+pnpm lint            # ESLint
+pnpm lint:fix        # ESLint con auto-fix
+pnpm format          # Prettier write
+pnpm format:check    # Prettier check
+```
+
+---
+
+## Docker
+
+Multi-stage Dockerfile con targets separados para bot y dashboard:
+
+```bash
+# Build y correr con docker-compose
+docker compose up -d
+
+# O individualmente
+docker build --target bot -t trading-bot .
+docker build --target dashboard -t trading-dashboard .
+```
+
+Los dos containers comparten un volumen `bot-data` para la DB SQLite.
+
+---
+
+## CI/CD
+
+GitHub Actions (`.github/workflows/ci.yml`): Node 22, pnpm 9.
+
+Pipeline: `install → typecheck → lint → test`
+
+Se ejecuta en push a `main`/`master` y en pull requests.
+
+---
+
+## shadcn/ui
+
+El dashboard usa [shadcn/ui](https://ui.shadcn.com) (estilo new-york, dark theme) con 17 componentes:
+
+`badge`, `button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `scroll-area`, `select`, `separator`, `skeleton`, `sonner`, `switch`, `table`, `tabs`, `tooltip`, `alert`
+
+Todos los componentes custom usan semantic design tokens (`text-foreground`, `bg-card`, `bg-muted`, `border-border`) en vez de colores hardcodeados.
+
+Config: `packages/dashboard/components.json`, utility `cn()` en `src/lib/utils.ts`.

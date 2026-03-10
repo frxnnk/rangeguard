@@ -29,6 +29,7 @@ export class Vault {
       N: SCRYPT_N,
       r: SCRYPT_R,
       p: SCRYPT_P,
+      maxmem: 256 * 1024 * 1024, // 256MB - required for N=2^17, r=8
     }) as Buffer;
   }
 
