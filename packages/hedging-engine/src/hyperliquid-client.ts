@@ -38,16 +38,18 @@ export interface AccountBalance {
 export class HyperliquidClient {
   private clients: Map<string, WalletClientEntry> = new Map(); // walletId -> client
   private apiUrl: string;
+  private isTestnet: boolean;
   private assetIndexCache: Map<string, number> = new Map(); // coin name -> asset index
 
   constructor(apiUrl: string) {
     this.apiUrl = apiUrl;
+    this.isTestnet = apiUrl.includes('testnet');
   }
 
   /** Initialize a wallet client from a private key */
   addWallet(walletId: string, alias: string, privateKey: string): void {
     const account = privateKeyToAccount(privateKey as `0x${string}`);
-    const transport = new hl.HttpTransport({ url: this.apiUrl });
+    const transport = new hl.HttpTransport({ isTestnet: this.isTestnet });
     const walletClient = new hl.WalletClient({ wallet: account, transport });
 
     this.clients.set(walletId, {
@@ -306,7 +308,7 @@ export class HyperliquidClient {
       }));
   }
 
-  /** Get account balance for a wallet */
+  /** Get account balance for a wallet (perps + spot for unified accounts) */
   async getBalance(walletId: string): Promise<AccountBalance> {
     const client = this.getWalletClient(walletId);
     const transport = client.transport;
@@ -315,13 +317,29 @@ export class HyperliquidClient {
     const state = await publicClient.clearinghouseState({ user: client.address as `0x${string}` });
 
     const crossMarginSummary = state.crossMarginSummary;
-    const accountValue = parseFloat(crossMarginSummary.accountValue ?? '0');
+    let accountValue = parseFloat(crossMarginSummary.accountValue ?? '0');
     const marginUsed = parseFloat(crossMarginSummary.totalMarginUsed ?? '0');
+
+    // On unified accounts (testnet), funds may be in spot — check spotClearinghouseState too
+    if (accountValue === 0) {
+      try {
+        const spotState = await publicClient.spotClearinghouseState({
+          user: client.address as `0x${string}`,
+        });
+        const usdcBalance = spotState.balances?.find((b: any) => b.coin === 'USDC');
+        if (usdcBalance) {
+          accountValue = parseFloat(usdcBalance.total ?? '0');
+        }
+      } catch {
+        // spotClearinghouseState may not be available on all versions
+      }
+    }
+
     const available = Math.max(0, accountValue - marginUsed);
     return {
       available: available.toString(),
       marginUsed: crossMarginSummary.totalMarginUsed ?? '0',
-      total: crossMarginSummary.accountValue ?? '0',
+      total: accountValue.toString(),
     };
   }
 

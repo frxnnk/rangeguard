@@ -43,7 +43,7 @@ export class RangeDetector {
   register(config: PoolConfig): void {
     this.states.set(config.id, {
       configId: config.id,
-      currentState: (config.status as RangeState) || 'in-range',
+      currentState: 'in-range', // Always start fresh — let debounce detect current state
       pendingState: null,
       consecutiveCount: 0,
       protectionDirection: config.protectionDirection,

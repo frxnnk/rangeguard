@@ -58,8 +58,10 @@ function buildRpcConfig(): Record<number, { http: string; ws?: string }> {
 }
 
 function loadDotenv(): void {
-  const envPath = resolve(process.cwd(), '.env');
-  if (!existsSync(envPath)) return;
+  // Try monorepo root first, then cwd
+  const candidates = [resolve(monorepoRoot, '.env'), resolve(process.cwd(), '.env')];
+  const envPath = candidates.find(existsSync);
+  if (!envPath) return;
 
   const content = readFileSync(envPath, 'utf-8');
   for (const line of content.split('\n')) {
