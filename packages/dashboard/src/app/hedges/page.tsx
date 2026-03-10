@@ -2,6 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { HedgeCard } from '@/components/hedges/HedgeCard';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function HedgesPage() {
   const queryClient = useQueryClient();
@@ -28,24 +32,30 @@ export default function HedgesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Active Hedges</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Active Hedges</h1>
 
       {closeMutation.isError && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">
-          {closeMutation.error.message}
-        </div>
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{closeMutation.error.message}</AlertDescription>
+        </Alert>
       )}
 
       {closeMutation.isSuccess && (
-        <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg text-sm mb-4">
-          Hedge closed. P&L: ${closeMutation.data.realizedPnl}
-        </div>
+        <Alert className="mb-4 border-green-500/30 text-green-400 [&>svg]:text-green-400">
+          <CheckCircle2 className="size-4" />
+          <AlertDescription>Hedge closed. P&L: ${closeMutation.data.realizedPnl}</AlertDescription>
+        </Alert>
       )}
 
       {isLoading ? (
-        <div className="text-gray-500">Loading hedges...</div>
+        <div className="grid gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-40 rounded-xl" />
+          ))}
+        </div>
       ) : hedges.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-muted-foreground">
           No active hedges. Hedges open automatically when price exits a pool's range.
         </div>
       ) : (
@@ -54,17 +64,18 @@ export default function HedgesPage() {
             <div key={hedge.id}>
               <HedgeCard hedge={hedge} />
               <div className="flex justify-end mt-2">
-                <button
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-xs text-destructive"
                   onClick={() => {
                     if (confirm('Close this hedge manually? This will record the close in DB.')) {
                       closeMutation.mutate(hedge.id);
                     }
                   }}
                   disabled={closeMutation.isPending}
-                  className="text-xs text-red-500 hover:text-red-400 disabled:text-red-500/50 transition-colors"
                 >
                   {closeMutation.isPending ? 'Closing...' : 'Close Manually'}
-                </button>
+                </Button>
               </div>
             </div>
           ))}

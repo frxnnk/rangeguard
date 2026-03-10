@@ -37,10 +37,10 @@ export function Sidebar() {
   const isRunning = botStatus?.running ?? false;
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
-      <div className="p-6 border-b border-gray-800">
-        <h1 className="text-xl font-bold text-white">Trading Bot</h1>
-        <p className="text-xs text-gray-500 mt-1">Liquidity Pool Hedging</p>
+    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+      <div className="p-6 border-b border-sidebar-border">
+        <h1 className="text-xl font-bold text-sidebar-foreground">Trading Bot</h1>
+        <p className="text-xs text-muted-foreground mt-1">Liquidity Pool Hedging</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -52,8 +52,8 @@ export function Sidebar() {
               href={href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-blue-600/20 text-blue-400'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
+                  ? 'bg-sidebar-primary/20 text-sidebar-primary'
+                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
               }`}
             >
               <svg
@@ -71,14 +71,16 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-800">
+      <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-2">
           <span
             className={`w-2 h-2 rounded-full ${
               isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'
             }`}
           />
-          <span className="text-xs text-gray-500">{isRunning ? 'Bot Running' : 'Bot Offline'}</span>
+          <span className="text-xs text-muted-foreground">
+            {isRunning ? 'Bot Running' : 'Bot Offline'}
+          </span>
         </div>
       </div>
     </aside>

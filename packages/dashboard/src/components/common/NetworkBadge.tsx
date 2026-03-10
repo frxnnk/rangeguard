@@ -14,7 +14,13 @@ const CHAIN_COLORS: Record<string, string> = {
 
 export function NetworkBadge({ chainName }: NetworkBadgeProps) {
   return (
-    <Badge variant="outline" className={cn('rounded-md', CHAIN_COLORS[chainName] || 'bg-muted text-muted-foreground border-border')}>
+    <Badge
+      variant="outline"
+      className={cn(
+        'rounded-md',
+        CHAIN_COLORS[chainName] || 'bg-muted text-muted-foreground border-border',
+      )}
+    >
       {chainName}
     </Badge>
   );

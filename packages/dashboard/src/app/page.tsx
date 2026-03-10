@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { AlertBanner } from '@/components/common/AlertBanner';
 import { PnLChart } from '@/components/charts/PnLChart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Stats {
   totalPools: number;
@@ -25,7 +27,17 @@ export default function OverviewPage() {
     queryFn: () => fetch('/api/pnl').then((r) => r.json()),
   });
 
-  if (!stats) return <div className="text-gray-500">Loading...</div>;
+  if (!stats)
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
 
   const cards = [
     { label: 'Active Pools', value: `${stats.activePools}/${stats.totalPools}`, color: 'blue' },
@@ -49,7 +61,7 @@ export default function OverviewPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Overview</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Overview</h1>
 
       {stats.lowBalanceWallets.length > 0 && (
         <div className="mb-6 space-y-2">
@@ -65,18 +77,23 @@ export default function OverviewPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
         {cards.map((card) => (
-          <div key={card.label} className={`border rounded-xl p-4 ${colorMap[card.color]}`}>
-            <p className="text-xs opacity-70 mb-1">{card.label}</p>
-            <p className="text-2xl font-bold">{card.value}</p>
-          </div>
+          <Card key={card.label} className={`${colorMap[card.color]}`}>
+            <CardContent className="p-4">
+              <p className="text-xs opacity-70 mb-1">{card.label}</p>
+              <p className="text-2xl font-bold">{card.value}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Cumulative P&L Chart */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-        <h2 className="text-lg font-semibold text-white mb-4">Cumulative P&L</h2>
-        <PnLChart data={pnlData} />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Cumulative P&L</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PnLChart data={pnlData} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

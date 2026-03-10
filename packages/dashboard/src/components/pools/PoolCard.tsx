@@ -86,7 +86,9 @@ export function PoolCard({ pool, onToggle, onDelete }: PoolCardProps) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Direction</p>
-            <p className="text-sm font-medium text-foreground capitalize">{pool.protectionDirection}</p>
+            <p className="text-sm font-medium text-foreground capitalize">
+              {pool.protectionDirection}
+            </p>
           </div>
         </div>
       </CardContent>

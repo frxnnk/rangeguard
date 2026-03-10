@@ -128,7 +128,7 @@ export function PoolForm() {
       <div className="grid grid-cols-2 gap-4">
         {/* Chain */}
         <div>
-          <Label>Network</label>
+          <Label>Network</Label>
           <select
             value={form.chainId}
             onChange={(e) => {
@@ -136,7 +136,7 @@ export function PoolForm() {
               const chain = CHAINS.find((c) => c.id === chainId);
               setForm((f) => ({ ...f, chainId, chainName: chain?.name || '' }));
             }}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
             {CHAINS.map((c) => (
               <option key={c.id} value={c.id}>
@@ -148,11 +148,11 @@ export function PoolForm() {
 
         {/* Pair */}
         <div>
-          <Label>Pair</label>
+          <Label>Pair</Label>
           <select
             value={form.pairIndex}
             onChange={(e) => setForm((f) => ({ ...f, pairIndex: parseInt(e.target.value) }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
             {DEFAULT_PAIRS.map((p, i) => (
               <option key={i} value={i}>
@@ -165,24 +165,24 @@ export function PoolForm() {
 
       {/* Pool Address */}
       <div>
-        <Label>Pool Address</label>
-        <input
+        <Label>Pool Address</Label>
+        <Input
           type="text"
           value={form.poolAddress}
           onChange={(e) => setForm((f) => ({ ...f, poolAddress: e.target.value }))}
           placeholder="0x..."
           required
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm font-mono focus:outline-none focus:border-blue-500"
+          className="bg-muted border-border text-foreground font-mono"
         />
       </div>
 
       {/* Fee Tier */}
       <div>
-        <Label>Fee Tier</label>
+        <Label>Fee Tier</Label>
         <select
           value={form.feeTier}
           onChange={(e) => setForm((f) => ({ ...f, feeTier: parseInt(e.target.value) }))}
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
         >
           {FEE_TIERS.map((ft) => (
             <option key={ft.value} value={ft.value}>
@@ -195,65 +195,65 @@ export function PoolForm() {
       {/* Range */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label>Range Lower ($)</label>
-          <input
+          <Label>Range Lower ($)</Label>
+          <Input
             type="number"
             step="any"
             value={form.rangeLower}
             onChange={(e) => setForm((f) => ({ ...f, rangeLower: e.target.value }))}
             placeholder="2000"
             required
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="bg-muted border-border text-foreground"
           />
         </div>
         <div>
-          <Label>Range Upper ($)</label>
-          <input
+          <Label>Range Upper ($)</Label>
+          <Input
             type="number"
             step="any"
             value={form.rangeUpper}
             onChange={(e) => setForm((f) => ({ ...f, rangeUpper: e.target.value }))}
             placeholder="2500"
             required
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="bg-muted border-border text-foreground"
           />
         </div>
       </div>
 
       {/* Pool Amount */}
       <div>
-        <Label>Pool Amount (USD)</label>
-        <input
+        <Label>Pool Amount (USD)</Label>
+        <Input
           type="number"
           step="any"
           value={form.poolAmount}
           onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
           placeholder="10000"
           required
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          className="bg-muted border-border text-foreground"
         />
       </div>
 
       {/* Name (optional) */}
       <div>
-        <Label>Name (optional)</label>
-        <input
+        <Label>Name (optional)</Label>
+        <Input
           type="text"
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           placeholder="ETH/USDC Arbitrum Narrow"
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          className="bg-muted border-border text-foreground"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         {/* Leverage */}
         <div>
-          <Label>Leverage</label>
+          <Label>Leverage</Label>
           <select
             value={form.leverage}
             onChange={(e) => setForm((f) => ({ ...f, leverage: parseInt(e.target.value) }))}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
             <option value={10}>10x</option>
             <option value={20}>20x</option>
@@ -262,7 +262,7 @@ export function PoolForm() {
 
         {/* Protection Direction */}
         <div>
-          <Label>Protection Direction</label>
+          <Label>Protection Direction</Label>
           <select
             value={form.protectionDirection}
             onChange={(e) =>
@@ -271,7 +271,7 @@ export function PoolForm() {
                 protectionDirection: e.target.value as 'below' | 'above' | 'both',
               }))
             }
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
             <option value="below">Below only (Short)</option>
             <option value="above">Above only (Long)</option>
@@ -282,12 +282,12 @@ export function PoolForm() {
 
       {/* Protection Wallet */}
       <div>
-        <Label>Protection Wallet</label>
+        <Label>Protection Wallet</Label>
         <select
           value={form.protectionWalletId}
           onChange={(e) => setForm((f) => ({ ...f, protectionWalletId: e.target.value }))}
           required
-          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+          className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
         >
           <option value="">Select wallet...</option>
           {protectionWallets.map((w) => (
@@ -305,33 +305,29 @@ export function PoolForm() {
 
       {/* Toggles */}
       <div className="flex items-center gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
           <input
             type="checkbox"
             checked={form.profitWalletEnabled}
             onChange={(e) => setForm((f) => ({ ...f, profitWalletEnabled: e.target.checked }))}
-            className="rounded bg-gray-800 border-gray-700"
+            className="rounded bg-muted border-border"
           />
           Mirror on profit wallet
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+        <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
           <input
             type="checkbox"
             checked={form.protectionActive}
             onChange={(e) => setForm((f) => ({ ...f, protectionActive: e.target.checked }))}
-            className="rounded bg-gray-800 border-gray-700"
+            className="rounded bg-muted border-border"
           />
           Protection active
         </label>
       </div>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
-      >
+      <Button className="w-full" disabled={submitting}>
         {submitting ? 'Creating...' : 'Create Pool'}
-      </button>
+      </Button>
     </form>
   );
 }
