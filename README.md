@@ -1,6 +1,16 @@
 # Trading Bot CGR
 
+[![CI](https://github.com/frxnnk/trading-bot-cgr/actions/workflows/ci.yml/badge.svg)](https://github.com/frxnnk/trading-bot-cgr/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)
+![Node.js](https://img.shields.io/badge/Node.js-22+-green)
+![License](https://img.shields.io/badge/License-Proprietary-red)
+![Tests](https://img.shields.io/badge/Tests-62%20passing-brightgreen)
+
 Bot de cobertura automatizada contra **Impermanent Loss** en pools de liquidez concentrada (Uniswap V3). Cuando el precio sale del rango configurado, el bot abre posiciones de hedge en **Hyperliquid DEX** (perpetuos) para compensar la perdida. Cuando vuelve al rango, cierra las posiciones automaticamente.
+
+<!-- Screenshots — replace placeholders when captures are available -->
+<!-- ![Overview](docs/images/overview.png) -->
+<!-- ![Pools](docs/images/pools.png) -->
 
 ---
 
@@ -67,59 +77,37 @@ npm install -g pnpm
 
 ## Arquitectura
 
-```
-                        Uniswap V3 Pools
-                     (Arbitrum, Base, etc.)
-                              |
-                   WebSocket events / slot0 polling
-                              |
-                              v
-┌─────────────────────────────────────────────────────────────┐
-│                        apps/bot                             │
-│                                                             │
-│  ┌──────────┐    ┌──────────────┐    ┌──────────────────┐   │
-│  │  Config   │    │  Event Bus   │    │ Graceful Shutdown│   │
-│  │  Loader   │    │  (typed)     │    │ SIGINT/SIGTERM   │   │
-│  └──────────┘    └──────┬───────┘    └──────────────────┘   │
-│                         │                                   │
-│         ┌───────────────┼───────────────┐                   │
-│         v               v               v                   │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐       │
-│  │pool-monitor │ │hedging-     │ │  wallet-monitor  │       │
-│  │             │ │engine       │ │  (balance check) │       │
-│  │PoolWatcher  │ │             │ └─────────────────┘       │
-│  │RangeDetector│ │HedgeCalc    │                            │
-│  │PriceFeed    │ │OrderExecutor│                            │
-│  └──────┬──────┘ │PositionTrack│                            │
-│         │        └──────┬──────┘                            │
-│         │               │                                   │
-│         │               v                                   │
-│         │        Hyperliquid DEX                            │
-│         │        (testnet/mainnet)                           │
-│         v                                                   │
-│  ┌─────────────┐                                            │
-│  │  SQLite DB  │◄──── packages/db (repositories)            │
-│  │  (WAL mode) │                                            │
-│  └──────┬──────┘                                            │
-│         │                                                   │
-└─────────┼───────────────────────────────────────────────────┘
-          │
-          │  Shared DB file
-          │
-┌─────────┼───────────────────────────────────────────────────┐
-│         v              packages/dashboard                   │
-│  ┌─────────────┐                                            │
-│  │ Next.js API │  GET/POST /api/pools, /api/wallets, etc.   │
-│  │  Routes     │                                            │
-│  └──────┬──────┘                                            │
-│         │                                                   │
-│         v                                                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              React Dashboard (SPA)                  │    │
-│  │  Overview | Pools | Wallets | Hedges | History      │    │
-│  │  TanStack Query (auto-refresh 5s) + Recharts       │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph OnChain["On-Chain"]
+        UNI["Uniswap V3 Pools<br/>(Arbitrum, Base, Polygon, ETH)"]
+    end
+
+    subgraph Bot["apps/bot"]
+        EB["Event Bus"]
+        PM["pool-monitor<br/>PoolWatcher + RangeDetector"]
+        HE["hedging-engine<br/>HedgeCalc + OrderExecutor"]
+        WM["wallet-monitor"]
+    end
+
+    subgraph Dashboard["packages/dashboard"]
+        API["Next.js API Routes"]
+        UI["React Dashboard<br/>TanStack Query + Recharts"]
+    end
+
+    DB[("SQLite (WAL)")]
+    HL["Hyperliquid DEX"]
+    VAULT["Encrypted Vault<br/>AES-256-GCM"]
+
+    UNI -- "WebSocket / polling" --> PM
+    PM -- "price-update" --> EB
+    EB -- "range-exit / range-return" --> HE
+    HE -- "open/close orders" --> HL
+    HE -- "hedge_trades" --> DB
+    PM -- "price_cache" --> DB
+    WM -- "balances" --> DB
+    VAULT -. "private keys" .-> HE
+    DB --> API --> UI
 ```
 
 El bot y el dashboard son **dos procesos separados** que comparten la misma base de datos SQLite. El bot escribe (precios, hedges, trades) y el dashboard lee y muestra.
@@ -132,61 +120,61 @@ El bot y el dashboard son **dos procesos separados** que comparten la misma base
 
 ```
 Pool Uniswap V3
-    │
-    ├─ WebSocket: Swap events en tiempo real (preferido)
-    │  └─ Si WS falla → fallback a polling slot0 cada 5s
-    │
+    |
+    +-- WebSocket: Swap events en tiempo real (preferido)
+    |   `-- Si WS falla -> fallback a polling slot0 cada 5s
+    |
     v
 PoolWatcher
-    │  Extrae sqrtPriceX96 + tick → calcula currentPrice
-    │
+    |  Extrae sqrtPriceX96 + tick -> calcula currentPrice
+    |
     v
 PriceFeed (cache en memoria) + DB (price_cache)
-    │
+    |
     v
 RangeDetector (maquina de estados)
-    │  Compara currentPrice vs [rangeLower, rangeUpper]
-    │  Requiere 3 updates consecutivos para confirmar transicion
-    │  Cooldown post-retorno para evitar whipsaw
-    │
-    ├─ RANGE EXIT  ──→ HedgingEngine.onRangeExit()
-    └─ RANGE RETURN ──→ HedgingEngine.onRangeReturn()
+    |  Compara currentPrice vs [rangeLower, rangeUpper]
+    |  Requiere 3 updates consecutivos para confirmar transicion
+    |  Cooldown post-retorno para evitar whipsaw
+    |
+    +-- RANGE EXIT  --> HedgingEngine.onRangeExit()
+    `-- RANGE RETURN --> HedgingEngine.onRangeReturn()
 ```
 
 ### 2. Apertura de hedge (range exit)
 
 ```
 RangeDetector confirma salida
-    │
+    |
     v
 HedgingEngine.onRangeExit()
-    │
-    ├─ 1. Verificar pool activo + sin hedge abierto
-    ├─ 2. HedgeCalculator: size = poolAmount / currentPrice
-    │     Exit below → SHORT | Exit above → LONG
-    ├─ 3. OrderExecutor.openHedge()
-    │     ├─ Protection wallet: market order (IOC limit + 1% slippage)
-    │     └─ Profit wallet (opcional): mirror trade
-    ├─ 4. PositionTracker.recordOpen() → DB hedge_trades
-    └─ 5. Actualizar pool status → out-of-range-below/above
+    |
+    +-- 1. Verificar pool activo + sin hedge abierto
+    +-- 2. HedgeCalculator: size = poolAmount / currentPrice
+    |     Exit below -> SHORT | Exit above -> LONG
+    +-- 3. OrderExecutor.openHedge()
+    |     +-- Protection wallet: market order (IOC limit + 1% slippage)
+    |     `-- Profit wallet (opcional): mirror trade
+    +-- 4. PositionTracker.recordOpen() -> DB hedge_trades
+    `-- 5. Actualizar pool status -> out-of-range-below/above
 ```
 
 ### 3. Cierre de hedge (range return)
 
 ```
 RangeDetector confirma retorno
-    │
+    |
     v
 HedgingEngine.onRangeReturn()
-    │
-    ├─ 1. Buscar hedges abiertos del pool
-    ├─ 2. Calcular PnL:
-    │     Short: (entryPrice - exitPrice) * size
-    │     Long:  (exitPrice - entryPrice) * size
-    ├─ 3. Marcar false breakout si PnL < 0
-    ├─ 4. OrderExecutor.closeHedge() → reduceOnly orders
-    ├─ 5. PositionTracker.recordClose() → DB
-    └─ 6. Pool status → in-range + activar cooldown
+    |
+    +-- 1. Buscar hedges abiertos del pool
+    +-- 2. Calcular PnL:
+    |     Short: (entryPrice - exitPrice) * size
+    |     Long:  (exitPrice - entryPrice) * size
+    +-- 3. Marcar false breakout si PnL < 0
+    +-- 4. OrderExecutor.closeHedge() -> reduceOnly orders
+    +-- 5. PositionTracker.recordClose() -> DB
+    `-- 6. Pool status -> in-range + activar cooldown
 ```
 
 ---
@@ -204,94 +192,32 @@ trading-bot-cgr/
 │
 ├── packages/
 │   ├── common/                       # Tipos, constantes y utilidades compartidas
-│   │   └── src/
-│   │       ├── types/                # AppConfig, PoolConfig, Wallet, HedgeTrade, Events
-│   │       ├── constants/            # Chains, pairs, ABIs, Hyperliquid config
-│   │       └── utils/                # Logger (pino), tick-math, retry con backoff
-│   │
-│   ├── db/                           # Persistencia SQLite
-│   │   └── src/
-│   │       ├── connection.ts         # Singleton, WAL mode, busy_timeout 5s
-│   │       ├── test-utils.ts         # createTestDb() para tests (SQLite in-memory)
-│   │       ├── migrations/
-│   │       │   └── 001_initial.ts    # Schema: 6 tablas + indices
-│   │       └── repositories/         # pools, wallets, hedges, trade-log, pnl
-│   │
-│   ├── security/                     # Gestion de private keys
-│   │   └── src/
-│   │       ├── vault.ts              # AES-256-GCM + scrypt KDF, archivo encriptado
-│   │       ├── key-manager.ts        # Carga keys en memoria desde vault
-│   │       └── setup-cli.ts          # CLI interactivo (listar, agregar, borrar keys)
-│   │
-│   ├── pool-monitor/                 # Lectura on-chain
-│   │   └── src/
-│   │       ├── chain-client.ts       # viem PublicClient multi-chain (HTTP + WS)
-│   │       ├── pool-watcher.ts       # Swap events via WS, fallback a slot0 polling
-│   │       ├── range-detector.ts     # Maquina de estados: in-range / out-of-range
-│   │       └── price-feed.ts         # Cache de precios en memoria
-│   │
-│   ├── hedging-engine/               # Ejecucion de trades en Hyperliquid
-│   │   └── src/
-│   │       ├── engine.ts             # Orquestador: onRangeExit / onRangeReturn
-│   │       ├── hedge-calculator.ts   # poolAmount / price = size, direction → side
-│   │       ├── hyperliquid-client.ts # Wrapper de @nktkas/hyperliquid SDK
-│   │       ├── order-executor.ts     # Abre/cierra en protection + profit wallets
-│   │       ├── position-tracker.ts   # CRUD de hedge_trades en DB
-│   │       ├── stop-loss-manager.ts  # Backup SL trigger orders en HL
-│   │       └── wallet-monitor.ts     # Chequeo periodico de balances
-│   │
-│   └── dashboard/                    # UI web
-│       ├── components.json           # Config shadcn/ui
-│       └── src/
-│           ├── lib/utils.ts          # cn() utility para shadcn/ui
-│           ├── components/ui/        # 17 shadcn/ui components
-│           ├── app/
-│           │   ├── layout.tsx        # Root layout, sidebar, dark theme
-│           │   ├── page.tsx          # Overview: stats cards, P&L chart, alertas
-│           │   ├── providers.tsx     # TanStack Query (refetch 5s)
-│           │   ├── pools/            # Lista, detalle, crear, editar pool
-│           │   ├── wallets/          # Lista + form agregar wallet
-│           │   ├── hedges/           # Hedges abiertos + close manual
-│           │   ├── history/          # Tabla trades cerrados con filtros
-│           │   ├── settings/         # Configuracion del bot
-│           │   └── api/              # Next.js API Route Handlers
-│           └── components/
-│               ├── charts/           # PnLChart, PriceChart (Recharts)
-│               ├── common/           # Sidebar, AlertBanner, NetworkBadge, StatusBadge
-│               ├── pools/            # PoolCard, PoolForm, ProtectionToggle, RangeIndicator
-│               ├── hedges/           # HedgeCard, PnLDisplay
-│               └── wallets/          # WalletCard, WalletForm, WalletList
+│   ├── db/                           # SQLite (WAL), 6 tablas, repository pattern
+│   ├── security/                     # AES-256-GCM vault para private keys
+│   ├── pool-monitor/                 # viem multi-chain, Swap events WS + slot0 polling
+│   ├── hedging-engine/               # @nktkas/hyperliquid SDK, hedge calc, order exec
+│   └── dashboard/                    # Next.js 15 + shadcn/ui, monitoring UI
 │
-├── scripts/
-│   ├── setup-keys.ts                 # CLI interactivo para gestionar private keys
-│   ├── setup-testnet.ts              # Setup automatico: genera keys + vault + DB seed
-│   └── testnet-seed.ts               # Seed DB con datos de prueba (dummy addresses)
-│
-├── .env.example                      # Template de variables de entorno
-├── .github/workflows/ci.yml          # GitHub Actions CI pipeline
-├── Dockerfile                        # Multi-stage (targets: bot, dashboard)
+├── scripts/                          # Setup & seed scripts
+├── .github/workflows/ci.yml          # GitHub Actions CI
+├── Dockerfile                        # Multi-stage (bot + dashboard targets)
 ├── docker-compose.yml                # Bot + Dashboard con volumen compartido
-├── eslint.config.js                  # ESLint flat config
-├── .prettierrc.json                  # Prettier config
-├── vitest.workspace.ts               # Vitest workspace config
-├── CLAUDE.md                         # Contexto del proyecto para AI-assisted dev
-├── pnpm-workspace.yaml               # packages/* + apps/*
-└── package.json                      # Scripts del monorepo
+└── LICENSE                           # Proprietary
 ```
 
 ### Dependencias entre packages
 
 ```
-common ◄─── db ◄─── security
-  ▲          ▲         ▲
-  │          │         │
-  ├── pool-monitor     │
-  │          │         │
-  └── hedging-engine ──┘
-              ▲
-              │
-           apps/bot ──→ todos los packages
-           dashboard ──→ db, common
+common <--- db <--- security
+  ^          ^         ^
+  |          |         |
+  +-- pool-monitor     |
+  |          |         |
+  `-- hedging-engine --'
+              ^
+              |
+           apps/bot --> todos los packages
+           dashboard --> db, common
 ```
 
 ---
@@ -389,6 +315,7 @@ Next.js 15 + React 19 + TailwindCSS 4 + shadcn/ui. Dark theme. Auto-refresh cada
 | Hedges      | `/hedges`         | Posiciones abiertas con PnL no realizado. Boton cierre manual.                                       |
 | History     | `/history`        | Tabla de trades cerrados, PnL realizado, filtro false breakouts (Switch).                            |
 | Settings    | `/settings`       | Configuracion del bot.                                                                               |
+| Landing     | `/landing`        | Landing page del producto.                                                                           |
 
 ### API Routes
 
@@ -686,31 +613,6 @@ Ciclo completo de hedge open → close probado en Hyperliquid testnet:
 | Hedge close            | Posicion cerrada @ $2072.34, PnL: -$0.09                     |
 | DB verification        | `status=closed`, `close_reason=range_return`, PnL registrado |
 | Manual close via API   | `POST /api/hedges/[id]/close` → cierra hedge y calcula PnL   |
-
-### API Endpoints (todos verificados)
-
-```
-GET  /api/stats              ✓  Overview stats
-GET  /api/pools              ✓  Lista pools
-POST /api/pools              ✓  Crear pool
-GET  /api/pools/:id          ✓  Pool individual
-PUT  /api/pools/:id          ✓  Actualizar pool
-POST /api/pools/:id/toggle   ✓  Toggle proteccion
-GET  /api/wallets            ✓  Lista wallets
-POST /api/wallets            ✓  Crear wallet
-GET  /api/hedges             ✓  Hedges abiertos
-POST /api/hedges/:id/close   ✓  Cerrar hedge manual
-GET  /api/trades             ✓  Historial trades
-GET  /api/prices?asset=ETH   ✓  Precios cacheados
-GET  /api/pnl                ✓  Snapshots PnL
-GET  /api/bot-status         ✓  Heartbeat bot
-```
-
-### Dashboard Pages (todas renderizan HTTP 200)
-
-`/`, `/pools`, `/pools/:id`, `/pools/new`, `/wallets`, `/hedges`, `/history`, `/settings`
-
-Para la guia completa de testing en testnet: [docs/TESTNET_GUIDE.md](docs/TESTNET_GUIDE.md)
 
 ---
 

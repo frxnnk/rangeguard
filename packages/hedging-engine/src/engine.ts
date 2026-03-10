@@ -4,13 +4,13 @@ import type {
   RangeReturnEvent,
   HedgeOpenedEvent,
   HedgeClosedEvent,
-  PoolConfig,
 } from '@trading-bot/common';
 import type {
   PoolsRepository,
   HedgesRepository,
   WalletsRepository,
   TradeLogRepository,
+  StopLossRepository,
 } from '@trading-bot/db';
 import { HedgeCalculator } from './hedge-calculator.js';
 import { OrderExecutor } from './order-executor.js';
@@ -42,13 +42,14 @@ export class HedgingEngine {
     tradeLogRepo: TradeLogRepository,
     hlClient: HyperliquidClient,
     callbacks?: HedgeEventCallbacks,
+    slRepo?: StopLossRepository,
   ) {
     this.poolsRepo = poolsRepo;
     this.walletsRepo = walletsRepo;
     this.calculator = new HedgeCalculator();
     this.executor = new OrderExecutor(hlClient, tradeLogRepo);
     this.tracker = new PositionTracker(hedgesRepo);
-    this.slManager = new StopLossManager(hlClient);
+    this.slManager = new StopLossManager(hlClient, slRepo);
     this.hlClient = hlClient;
     this.callbacks = callbacks ?? {};
   }
@@ -116,6 +117,7 @@ export class HedgingEngine {
         result.protectionOrder.avgPrice ?? currentPrice.toString(),
         params.leverage,
         result.protectionOrder.orderId,
+        result.protectionOrder.estimatedFees,
       );
 
       this.poolsRepo.updateStatus(
@@ -161,6 +163,7 @@ export class HedgingEngine {
         result.profitOrder.avgPrice ?? currentPrice.toString(),
         params.leverage,
         result.profitOrder.orderId,
+        result.profitOrder.estimatedFees,
       );
 
       // Emit hedge-opened event for profit wallet
@@ -227,6 +230,12 @@ export class HedgingEngine {
       profitWallet?.id,
     );
 
+    // Map close results to wallet types for fee attribution
+    const closeFeeByWalletType: Record<string, string | undefined> = {
+      protection: result.protectionOrder.estimatedFees,
+      profit: result.profitOrder?.estimatedFees,
+    };
+
     // Record closures + emit events
     for (const hedge of openHedges) {
       const entryPrice = parseFloat(hedge.entryPrice);
@@ -239,6 +248,7 @@ export class HedgingEngine {
       }
 
       const isFalseBreakout = pnl < 0;
+      const closeFees = closeFeeByWalletType[hedge.walletType];
 
       this.tracker.recordClose(
         hedge.id,
@@ -246,6 +256,7 @@ export class HedgingEngine {
         pnl.toFixed(2),
         'range_return',
         isFalseBreakout,
+        closeFees,
       );
 
       // Emit hedge-closed event
@@ -294,7 +305,17 @@ export class HedgingEngine {
     const profitWallet = this.walletsRepo.findProfitWallet();
 
     // Close positions
-    await this.executor.closeHedge(config, openHedges[0].asset, currentPrice, profitWallet?.id);
+    const result = await this.executor.closeHedge(
+      config,
+      openHedges[0].asset,
+      currentPrice,
+      profitWallet?.id,
+    );
+
+    const closeFeeByWalletType: Record<string, string | undefined> = {
+      protection: result.protectionOrder.estimatedFees,
+      profit: result.profitOrder?.estimatedFees,
+    };
 
     // Record closures
     for (const hedge of openHedges) {
@@ -308,6 +329,7 @@ export class HedgingEngine {
       }
 
       const isFalseBreakout = pnl < 0;
+      const closeFees = closeFeeByWalletType[hedge.walletType];
 
       this.tracker.recordClose(
         hedge.id,
@@ -315,6 +337,7 @@ export class HedgingEngine {
         pnl.toFixed(2),
         'manual',
         isFalseBreakout,
+        closeFees,
       );
 
       this.callbacks.onHedgeClosed?.({
@@ -338,5 +361,76 @@ export class HedgingEngine {
   /** Get the position tracker for external queries */
   getTracker(): PositionTracker {
     return this.tracker;
+  }
+
+  /** Get the stop-loss manager (for orphan cleanup on startup) */
+  getStopLossManager(): StopLossManager {
+    return this.slManager;
+  }
+
+  /** Reconcile DB state with HL positions (run on startup to detect missed liquidations) */
+  async reconcilePositions(): Promise<void> {
+    const openHedges = this.tracker.getAllOpenHedges();
+    if (openHedges.length === 0) {
+      logger.info('No open hedges to reconcile');
+      return;
+    }
+
+    logger.info({ count: openHedges.length }, 'Reconciling hedge positions...');
+
+    // Group by walletId
+    const byWallet = new Map<string, typeof openHedges>();
+    for (const hedge of openHedges) {
+      const list = byWallet.get(hedge.walletId) ?? [];
+      list.push(hedge);
+      byWallet.set(hedge.walletId, list);
+    }
+
+    let reconciled = 0;
+
+    for (const [walletId, hedges] of byWallet) {
+      if (!this.hlClient.hasWallet(walletId)) {
+        logger.warn({ walletId }, 'Cannot reconcile — wallet not loaded');
+        continue;
+      }
+
+      let positions: { asset: string; size: string }[];
+      try {
+        positions = await this.hlClient.getPositions(walletId);
+      } catch (error) {
+        logger.warn({ walletId, error }, 'Failed to get positions for reconciliation');
+        continue;
+      }
+
+      const positionAssets = new Set(
+        positions.filter((p) => parseFloat(p.size) !== 0).map((p) => p.asset),
+      );
+
+      for (const hedge of hedges) {
+        if (!positionAssets.has(hedge.asset)) {
+          logger.warn(
+            { hedgeTradeId: hedge.id, walletId, asset: hedge.asset },
+            'Reconciliation: position missing from HL — marking as liquidated',
+          );
+
+          this.tracker.recordClose(hedge.id, '0', '0', 'liquidated', false);
+
+          this.callbacks.onHedgeClosed?.({
+            hedgeTradeId: hedge.id,
+            poolConfigId: hedge.poolConfigId,
+            walletId: hedge.walletId,
+            walletType: hedge.walletType,
+            realizedPnl: '0',
+            isFalseBreakout: false,
+            closeReason: 'liquidated',
+            timestamp: Date.now(),
+          });
+
+          reconciled++;
+        }
+      }
+    }
+
+    logger.info({ reconciled }, 'Reconciliation complete');
   }
 }

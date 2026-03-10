@@ -2,6 +2,7 @@
 FROM node:22-slim AS base
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN useradd -m -u 1001 botuser
 WORKDIR /app
 
 # ---- deps ----
@@ -24,8 +25,11 @@ RUN pnpm --filter @trading-bot/dashboard build
 # ---- bot (target) ----
 FROM deps AS bot
 COPY . .
+RUN mkdir -p /app/data && chown botuser:botuser /app/data
+RUN mkdir -p /home/botuser/.trading-bot-cgr && chown botuser:botuser /home/botuser/.trading-bot-cgr
 ENV NODE_ENV=production
-VOLUME ["/app/data"]
+USER botuser
+VOLUME ["/app/data", "/home/botuser/.trading-bot-cgr"]
 CMD ["node", "--no-warnings", "--import", "tsx", "apps/bot/src/main.ts"]
 
 # ---- dashboard (target) ----
@@ -36,6 +40,8 @@ COPY --from=deps /app/packages/common/node_modules ./packages/common/node_module
 COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
 COPY . .
+RUN mkdir -p /app/data && chown botuser:botuser /app/data
 ENV NODE_ENV=production
+USER botuser
 EXPOSE 3000
 CMD ["pnpm", "--filter", "@trading-bot/dashboard", "start"]

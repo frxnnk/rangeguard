@@ -16,6 +16,7 @@ export interface OrderResult {
   orderId?: string;
   filledSize?: string;
   avgPrice?: string;
+  estimatedFees?: string;
   error?: string;
   latencyMs: number;
 }

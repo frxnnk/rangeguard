@@ -10,6 +10,15 @@ import {
   ReferenceLine,
 } from 'recharts';
 
+// Colors matched to dark theme CSS variables (oklch)
+const CHART_COLORS = {
+  mutedForeground: '#a1a1aa', // --muted-foreground
+  card: '#1c1c1e', // --card
+  border: 'rgba(255,255,255,0.1)', // --border
+  destructive: '#ef4444', // --destructive
+  chartLine: '#818cf8', // brighter indigo for visibility on dark bg
+};
+
 interface PriceChartProps {
   data: Array<{ time: string; price: number }>;
   rangeLower?: number;
@@ -18,44 +27,44 @@ interface PriceChartProps {
 
 export function PriceChart({ data, rangeLower, rangeUpper }: PriceChartProps) {
   if (data.length === 0) {
-    return <div className="text-gray-500 text-center py-8">No price data</div>;
+    return <div className="text-muted-foreground text-center py-8">No price data</div>;
   }
 
   return (
     <ResponsiveContainer width="100%" height={300}>
       <AreaChart data={data}>
-        <XAxis dataKey="time" stroke="#6b7280" fontSize={12} />
-        <YAxis stroke="#6b7280" fontSize={12} domain={['auto', 'auto']} />
+        <XAxis dataKey="time" stroke={CHART_COLORS.mutedForeground} fontSize={12} />
+        <YAxis stroke={CHART_COLORS.mutedForeground} fontSize={12} domain={['auto', 'auto']} />
         <Tooltip
           contentStyle={{
-            backgroundColor: '#1f2937',
-            border: '1px solid #374151',
+            backgroundColor: CHART_COLORS.card,
+            border: `1px solid ${CHART_COLORS.border}`,
             borderRadius: '8px',
           }}
-          labelStyle={{ color: '#9ca3af' }}
+          labelStyle={{ color: CHART_COLORS.mutedForeground }}
         />
         {rangeLower && (
           <ReferenceLine
             y={rangeLower}
-            stroke="#ef4444"
+            stroke={CHART_COLORS.destructive}
             strokeDasharray="3 3"
-            label={{ value: 'Lower', fill: '#ef4444', fontSize: 11 }}
+            label={{ value: 'Lower', fill: CHART_COLORS.destructive, fontSize: 11 }}
           />
         )}
         {rangeUpper && (
           <ReferenceLine
             y={rangeUpper}
-            stroke="#ef4444"
+            stroke={CHART_COLORS.destructive}
             strokeDasharray="3 3"
-            label={{ value: 'Upper', fill: '#ef4444', fontSize: 11 }}
+            label={{ value: 'Upper', fill: CHART_COLORS.destructive, fontSize: 11 }}
           />
         )}
         <Area
           type="monotone"
           dataKey="price"
-          stroke="#3b82f6"
-          fill="#3b82f6"
-          fillOpacity={0.1}
+          stroke={CHART_COLORS.chartLine}
+          fill={CHART_COLORS.chartLine}
+          fillOpacity={0.15}
           strokeWidth={2}
         />
       </AreaChart>

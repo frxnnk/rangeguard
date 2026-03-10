@@ -24,11 +24,11 @@ export function RangeIndicator({ lower, upper, current }: RangeIndicatorProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between text-xs text-gray-500">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>${lower.toLocaleString()}</span>
         <span>${upper.toLocaleString()}</span>
       </div>
-      <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden">
+      <div className="relative h-3 bg-muted rounded-full overflow-hidden">
         {/* Range zone */}
         <div
           className="absolute h-full bg-green-500/30 border-x border-green-500/50"

@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.floor(minutes / 60)}h ago`;
+}
+
 interface HedgeCardProps {
   hedge: {
     id: string;
@@ -15,6 +23,8 @@ interface HedgeCardProps {
     walletType: string;
     fees: string;
     realizedPnl?: string;
+    unrealizedPnl?: string;
+    unrealizedPnlUpdatedAt?: number;
     openedAt: number;
   };
 }
@@ -72,9 +82,22 @@ export function HedgeCard({ hedge }: HedgeCardProps) {
               ${parseFloat(hedge.fees).toFixed(2)}
             </p>
           </div>
+          {hedge.unrealizedPnl && hedge.status === 'open' && (
+            <div>
+              <p className="text-xs text-muted-foreground">Unrealized P&L</p>
+              <p
+                className={cn(
+                  'text-sm font-medium',
+                  parseFloat(hedge.unrealizedPnl) >= 0 ? 'text-green-400' : 'text-red-400',
+                )}
+              >
+                ${parseFloat(hedge.unrealizedPnl).toFixed(2)}
+              </p>
+            </div>
+          )}
           {hedge.realizedPnl && (
             <div>
-              <p className="text-xs text-muted-foreground">P&L</p>
+              <p className="text-xs text-muted-foreground">Realized P&L</p>
               <p
                 className={cn(
                   'text-sm font-medium',
@@ -87,9 +110,16 @@ export function HedgeCard({ hedge }: HedgeCardProps) {
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground mt-3">
-          Opened {new Date(hedge.openedAt).toLocaleString()}
-        </p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-muted-foreground">
+            Opened {new Date(hedge.openedAt).toLocaleString()}
+          </p>
+          {hedge.unrealizedPnlUpdatedAt && hedge.status === 'open' && (
+            <p className="text-xs text-muted-foreground">
+              Updated {formatTimeAgo(hedge.unrealizedPnlUpdatedAt)}
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

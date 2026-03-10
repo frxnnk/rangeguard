@@ -1,11 +1,12 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { HedgeCard } from '@/components/hedges/HedgeCard';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function HedgesPage() {
   const queryClient = useQueryClient();
@@ -13,6 +14,7 @@ export default function HedgesPage() {
   const { data: hedges = [], isLoading } = useQuery({
     queryKey: ['hedges'],
     queryFn: () => fetch('/api/hedges').then((r) => r.json()),
+    refetchInterval: 30_000, // Refresh every 30s for live unrealized PnL
   });
 
   const closeMutation = useMutation({
@@ -24,29 +26,19 @@ export default function HedgesPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['hedges'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success(`Hedge closed. P&L: $${data.realizedPnl}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
     },
   });
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-foreground mb-6">Active Hedges</h1>
-
-      {closeMutation.isError && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="size-4" />
-          <AlertDescription>{closeMutation.error.message}</AlertDescription>
-        </Alert>
-      )}
-
-      {closeMutation.isSuccess && (
-        <Alert className="mb-4 border-green-500/30 text-green-400 [&>svg]:text-green-400">
-          <CheckCircle2 className="size-4" />
-          <AlertDescription>Hedge closed. P&L: ${closeMutation.data.realizedPnl}</AlertDescription>
-        </Alert>
-      )}
 
       {isLoading ? (
         <div className="grid gap-4">
@@ -55,9 +47,15 @@ export default function HedgesPage() {
           ))}
         </div>
       ) : hedges.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          No active hedges. Hedges open automatically when price exits a pool's range.
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <ShieldCheck className="size-10 text-muted-foreground mb-3" aria-hidden="true" />
+            <p className="text-muted-foreground text-sm">No active hedges.</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              Hedges open automatically when price exits a pool's range.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4">
           {hedges.map((hedge: any) => (
@@ -74,7 +72,7 @@ export default function HedgesPage() {
                   }}
                   disabled={closeMutation.isPending}
                 >
-                  {closeMutation.isPending ? 'Closing...' : 'Close Manually'}
+                  {closeMutation.isPending ? 'Closing\u2026' : 'Close Manually'}
                 </Button>
               </div>
             </div>

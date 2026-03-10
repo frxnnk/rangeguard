@@ -106,5 +106,18 @@ export function runMigrations(db: Database.Database): void {
       value TEXT NOT NULL,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch())
     );
+
+    CREATE TABLE IF NOT EXISTS stop_loss_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pool_config_id TEXT NOT NULL REFERENCES pool_configs(id),
+      wallet_id TEXT NOT NULL REFERENCES wallets(id),
+      wallet_type TEXT NOT NULL CHECK(wallet_type IN ('protection', 'profit')),
+      asset TEXT NOT NULL,
+      hl_order_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'cancelled', 'triggered')),
+      created_at INTEGER NOT NULL,
+      cancelled_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_sl_orders_pool ON stop_loss_orders(pool_config_id, status);
   `);
 }

@@ -309,6 +309,43 @@ describe('HedgesRepository', () => {
     });
   });
 
+  describe('findOpenByWallet', () => {
+    it('should return only open hedges for a specific wallet', () => {
+      const h1 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '1.0',
+        entryPrice: '2000',
+        leverage: 10,
+      });
+
+      repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '2.0',
+        entryPrice: '2100',
+        leverage: 10,
+      });
+
+      // Close the first hedge
+      repo.close(h1.id, '1900', '100', 'range_return', false);
+
+      const openByWallet = repo.findOpenByWallet(walletId);
+      expect(openByWallet).toHaveLength(1);
+      expect(openByWallet[0].size).toBe('2.0');
+
+      // Different wallet returns empty
+      const other = repo.findOpenByWallet('nonexistent-wallet');
+      expect(other).toHaveLength(0);
+    });
+  });
+
   describe('sumRealizedPnl', () => {
     it('should sum realized PnL of closed and liquidated trades', () => {
       const h1 = repo.create({

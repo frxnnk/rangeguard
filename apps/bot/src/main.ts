@@ -1,4 +1,4 @@
-import { createLogger } from '@trading-bot/common';
+import { createLogger, sendAlert } from '@trading-bot/common';
 import {
   getDatabase,
   closeDatabase,
@@ -8,6 +8,7 @@ import {
   HedgesRepository,
   TradeLogRepository,
   PnlRepository,
+  StopLossRepository,
 } from '@trading-bot/db';
 import { Vault, KeyManager } from '@trading-bot/security';
 import {
@@ -23,11 +24,41 @@ import { loadConfig } from './config.js';
 const logger = createLogger('bot');
 let lastPriceLogAt = 0;
 
+/** Fire-and-forget alert helper — noop if no webhook configured */
+function alert(webhookUrl: string | undefined, message: string): void {
+  if (webhookUrl) sendAlert(webhookUrl, message).catch(() => {});
+}
+
 async function main() {
+  // --- Crash handlers (before anything else) ---
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'Uncaught exception');
+    alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot crashed: uncaughtException — ${err.message}`);
+    setTimeout(() => process.exit(1), 2000); // give alert time to send
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.fatal({ reason }, 'Unhandled rejection');
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot crashed: unhandledRejection — ${msg}`);
+    setTimeout(() => process.exit(1), 2000);
+  });
+
   logger.info('Starting Trading Bot...');
 
   // 1. Load configuration
   const config = loadConfig();
+  const webhookUrl = config.alertWebhookUrl;
+
+  // Log warnings for missing config
+  if (!config.vault.password) {
+    logger.warn('No VAULT_PASSWORD set - wallet operations will fail until password is provided');
+  }
+  if (!webhookUrl) {
+    logger.warn('No ALERT_WEBHOOK_URL set — no external alerts will be sent');
+  }
+  if (config.hyperliquid.apiUrl.includes('testnet')) {
+    logger.warn('Using Hyperliquid TESTNET — not mainnet');
+  }
 
   // 2. Initialize database
   const db = getDatabase(config.db.path);
@@ -40,12 +71,9 @@ async function main() {
   const hedgesRepo = new HedgesRepository(db);
   const tradeLogRepo = new TradeLogRepository(db);
   const pnlRepo = new PnlRepository(db);
+  const slRepo = new StopLossRepository(db);
 
   // 4. Initialize security (vault + key manager)
-  if (!config.vault.password) {
-    logger.warn('No VAULT_PASSWORD set - wallet operations will fail until password is provided');
-  }
-
   const vault = new Vault(config.vault.password || '', config.vault.path);
   const keyManager = new KeyManager(vault);
 
@@ -73,10 +101,25 @@ async function main() {
   }
 
   // 8. Initialize hedging engine with event callbacks
-  const engine = new HedgingEngine(poolsRepo, walletsRepo, hedgesRepo, tradeLogRepo, hlClient, {
-    onHedgeOpened: (event) => eventBus.emit('hedge-opened', event),
-    onHedgeClosed: (event) => eventBus.emit('hedge-closed', event),
-  });
+  const engine = new HedgingEngine(
+    poolsRepo,
+    walletsRepo,
+    hedgesRepo,
+    tradeLogRepo,
+    hlClient,
+    {
+      onHedgeOpened: (event) => eventBus.emit('hedge-opened', event),
+      onHedgeClosed: (event) => eventBus.emit('hedge-closed', event),
+    },
+    slRepo,
+  );
+
+  // Cleanup orphaned SL orders from previous sessions
+  try {
+    await engine.getStopLossManager().cleanupOrphanedSLs();
+  } catch (error) {
+    logger.warn({ error }, 'Failed to cleanup orphaned SL orders');
+  }
 
   // 9. Initialize price feed
   const priceFeed = new PriceFeed();
@@ -130,7 +173,9 @@ async function main() {
     try {
       await engine.onRangeExit(event);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error, event }, 'Error handling range exit');
+      alert(webhookUrl, `🔴 Hedge open FAILED for pool ${event.poolConfigId}: ${msg}`);
     }
   });
 
@@ -138,37 +183,66 @@ async function main() {
     try {
       await engine.onRangeReturn(event);
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       logger.error({ error, event }, 'Error handling range return');
+      alert(webhookUrl, `🔴 Hedge close FAILED for pool ${event.poolConfigId}: ${msg}`);
     }
   });
 
   eventBus.on('hedge-opened', (event) => {
-    logger.info(
-      {
-        hedgeTradeId: event.hedgeTradeId,
-        poolConfigId: event.poolConfigId,
-        walletType: event.walletType,
-        side: event.side,
-        size: event.size,
-      },
-      'Hedge opened event',
-    );
+    try {
+      logger.info(
+        {
+          hedgeTradeId: event.hedgeTradeId,
+          poolConfigId: event.poolConfigId,
+          walletType: event.walletType,
+          side: event.side,
+          size: event.size,
+        },
+        'Hedge opened event',
+      );
+      alert(
+        webhookUrl,
+        `🟡 Hedge opened: ${event.side.toUpperCase()} ${event.size} @ $${event.entryPrice} (pool: ${event.poolConfigId}, wallet: ${event.walletType})`,
+      );
+    } catch (error) {
+      logger.error({ error }, 'Error in hedge-opened handler');
+    }
   });
 
   eventBus.on('hedge-closed', (event) => {
-    logger.info(
-      {
-        hedgeTradeId: event.hedgeTradeId,
-        poolConfigId: event.poolConfigId,
-        walletType: event.walletType,
-        pnl: event.realizedPnl,
-        closeReason: event.closeReason,
-      },
-      'Hedge closed event',
-    );
+    try {
+      logger.info(
+        {
+          hedgeTradeId: event.hedgeTradeId,
+          poolConfigId: event.poolConfigId,
+          walletType: event.walletType,
+          pnl: event.realizedPnl,
+          closeReason: event.closeReason,
+        },
+        'Hedge closed event',
+      );
+      const pnlNum = parseFloat(event.realizedPnl);
+      const emoji = pnlNum >= 0 ? '🟢' : '🔴';
+      const sign = pnlNum >= 0 ? '+' : '';
+      alert(
+        webhookUrl,
+        `${emoji} Hedge closed: PnL ${sign}$${pnlNum.toFixed(2)} (pool: ${event.poolConfigId}, reason: ${event.closeReason})`,
+      );
+    } catch (error) {
+      logger.error({ error }, 'Error in hedge-closed handler');
+    }
   });
 
-  // 13. Initialize wallet monitor
+  // Reconcile DB hedge state with actual HL positions (detect missed liquidations)
+  // Runs after event handlers are wired so reconciliation alerts are sent
+  try {
+    await engine.reconcilePositions();
+  } catch (error) {
+    logger.warn({ error }, 'Failed to reconcile positions on startup');
+  }
+
+  // 13. Initialize wallet monitor (with liquidation detection)
   const walletMonitor = new WalletMonitor(
     hlClient,
     walletsRepo,
@@ -183,7 +257,31 @@ async function main() {
         isLow: balance.isLow,
         timestamp: Date.now(),
       });
+
+      if (balance.isLow) {
+        alert(
+          webhookUrl,
+          `⚠️ Low balance: wallet "${wallet.alias}" has $${parseFloat(balance.available).toFixed(2)} (threshold: $${wallet.lowBalanceThreshold})`,
+        );
+      }
     },
+    hedgesRepo,
+    (event) => {
+      // Liquidation detected — mark hedge as liquidated in DB
+      const hedge = hedgesRepo.findById(event.hedgeTradeId);
+      if (hedge && hedge.status === 'open') {
+        hedgesRepo.close(hedge.id, '0', '0', 'liquidated', false);
+        logger.error(
+          { hedgeTradeId: hedge.id, walletId: event.walletId, asset: event.asset },
+          'Position liquidated on Hyperliquid',
+        );
+        alert(
+          webhookUrl,
+          `💀 LIQUIDATED: ${event.asset} hedge ${hedge.id} on wallet ${event.walletId} — position no longer exists on HL`,
+        );
+      }
+    },
+    pnlRepo,
   );
 
   // 14. Start monitoring active pools
@@ -263,14 +361,38 @@ async function main() {
     }
   }, 10_000);
 
+  // 16. DB cleanup — purge old price_cache and pnl_snapshots every hour
+  const cleanupInterval = setInterval(
+    () => {
+      try {
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+        pnlRepo.cleanupPriceCache(sevenDaysAgo);
+        pnlRepo.cleanupPnlSnapshots(ninetyDaysAgo);
+      } catch (error) {
+        logger.warn({ error }, 'DB cleanup failed');
+      }
+    },
+    60 * 60 * 1000,
+  ); // every hour
+
+  alert(webhookUrl, `⚡ Bot started — monitoring ${watchedPoolIds.size} pool(s)`);
   logger.info('Bot is running. Press Ctrl+C to stop.');
 
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down...');
+    alert(webhookUrl, '⛔ Bot shutting down');
+
+    // Force exit after 30s if cleanup hangs
+    const forceTimer = setTimeout(() => {
+      logger.error('Shutdown timeout — forcing exit');
+      process.exit(1);
+    }, 30_000);
 
     clearInterval(poolSyncInterval);
     clearInterval(heartbeatInterval);
+    clearInterval(cleanupInterval);
     walletMonitor.stop();
     poolWatcher.unwatchAll();
     eventBus.removeAllListeners();
@@ -278,6 +400,7 @@ async function main() {
     keyManager.clear();
     closeDatabase();
 
+    clearTimeout(forceTimer);
     logger.info('Shutdown complete');
     process.exit(0);
   };
@@ -291,5 +414,6 @@ async function main() {
 
 main().catch((error) => {
   logger.fatal({ error }, 'Fatal error');
-  process.exit(1);
+  alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot fatal error: ${error.message || error}`);
+  setTimeout(() => process.exit(1), 2000);
 });

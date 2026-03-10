@@ -6,6 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AlertCircle } from 'lucide-react';
 
 const CHAINS = [
@@ -127,74 +135,86 @@ export function PoolForm() {
 
       <div className="grid grid-cols-2 gap-4">
         {/* Chain */}
-        <div>
+        <div className="space-y-2">
           <Label>Network</Label>
-          <select
-            value={form.chainId}
-            onChange={(e) => {
-              const chainId = parseInt(e.target.value);
+          <Select
+            value={form.chainId.toString()}
+            onValueChange={(value) => {
+              const chainId = parseInt(value);
               const chain = CHAINS.find((c) => c.id === chainId);
               setForm((f) => ({ ...f, chainId, chainName: chain?.name || '' }));
             }}
-            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
-            {CHAINS.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHAINS.map((c) => (
+                <SelectItem key={c.id} value={c.id.toString()}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Pair */}
-        <div>
+        <div className="space-y-2">
           <Label>Pair</Label>
-          <select
-            value={form.pairIndex}
-            onChange={(e) => setForm((f) => ({ ...f, pairIndex: parseInt(e.target.value) }))}
-            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
+          <Select
+            value={form.pairIndex.toString()}
+            onValueChange={(value) => setForm((f) => ({ ...f, pairIndex: parseInt(value) }))}
           >
-            {DEFAULT_PAIRS.map((p, i) => (
-              <option key={i} value={i}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DEFAULT_PAIRS.map((p, i) => (
+                <SelectItem key={i} value={i.toString()}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Pool Address */}
-      <div>
+      <div className="space-y-2">
         <Label>Pool Address</Label>
         <Input
           type="text"
           value={form.poolAddress}
           onChange={(e) => setForm((f) => ({ ...f, poolAddress: e.target.value }))}
-          placeholder="0x..."
+          placeholder="0x\u2026"
           required
           className="bg-muted border-border text-foreground font-mono"
         />
       </div>
 
       {/* Fee Tier */}
-      <div>
+      <div className="space-y-2">
         <Label>Fee Tier</Label>
-        <select
-          value={form.feeTier}
-          onChange={(e) => setForm((f) => ({ ...f, feeTier: parseInt(e.target.value) }))}
-          className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
+        <Select
+          value={form.feeTier.toString()}
+          onValueChange={(value) => setForm((f) => ({ ...f, feeTier: parseInt(value) }))}
         >
-          {FEE_TIERS.map((ft) => (
-            <option key={ft.value} value={ft.value}>
-              {ft.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {FEE_TIERS.map((ft) => (
+              <SelectItem key={ft.value} value={ft.value.toString()}>
+                {ft.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Range */}
       <div className="grid grid-cols-2 gap-4">
-        <div>
+        <div className="space-y-2">
           <Label>Range Lower ($)</Label>
           <Input
             type="number"
@@ -206,7 +226,7 @@ export function PoolForm() {
             className="bg-muted border-border text-foreground"
           />
         </div>
-        <div>
+        <div className="space-y-2">
           <Label>Range Upper ($)</Label>
           <Input
             type="number"
@@ -221,7 +241,7 @@ export function PoolForm() {
       </div>
 
       {/* Pool Amount */}
-      <div>
+      <div className="space-y-2">
         <Label>Pool Amount (USD)</Label>
         <Input
           type="number"
@@ -235,7 +255,7 @@ export function PoolForm() {
       </div>
 
       {/* Name (optional) */}
-      <div>
+      <div className="space-y-2">
         <Label>Name (optional)</Label>
         <Input
           type="text"
@@ -248,56 +268,66 @@ export function PoolForm() {
 
       <div className="grid grid-cols-2 gap-4">
         {/* Leverage */}
-        <div>
+        <div className="space-y-2">
           <Label>Leverage</Label>
-          <select
-            value={form.leverage}
-            onChange={(e) => setForm((f) => ({ ...f, leverage: parseInt(e.target.value) }))}
-            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
+          <Select
+            value={form.leverage.toString()}
+            onValueChange={(value) => setForm((f) => ({ ...f, leverage: parseInt(value) }))}
           >
-            <option value={10}>10x</option>
-            <option value={20}>20x</option>
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10x</SelectItem>
+              <SelectItem value="20">20x</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Protection Direction */}
-        <div>
+        <div className="space-y-2">
           <Label>Protection Direction</Label>
-          <select
+          <Select
             value={form.protectionDirection}
-            onChange={(e) =>
+            onValueChange={(value) =>
               setForm((f) => ({
                 ...f,
-                protectionDirection: e.target.value as 'below' | 'above' | 'both',
+                protectionDirection: value as 'below' | 'above' | 'both',
               }))
             }
-            className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
           >
-            <option value="below">Below only (Short)</option>
-            <option value="above">Above only (Long)</option>
-            <option value="both">Both directions</option>
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="below">Below only (Short)</SelectItem>
+              <SelectItem value="above">Above only (Long)</SelectItem>
+              <SelectItem value="both">Both directions</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Protection Wallet */}
-      <div>
+      <div className="space-y-2">
         <Label>Protection Wallet</Label>
-        <select
+        <Select
           value={form.protectionWalletId}
-          onChange={(e) => setForm((f) => ({ ...f, protectionWalletId: e.target.value }))}
-          required
-          className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
+          onValueChange={(value) => setForm((f) => ({ ...f, protectionWalletId: value }))}
         >
-          <option value="">Select wallet...</option>
-          {protectionWallets.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.alias}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select wallet\u2026" />
+          </SelectTrigger>
+          <SelectContent>
+            {protectionWallets.map((w) => (
+              <SelectItem key={w.id} value={w.id}>
+                {w.alias}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {protectionWallets.length === 0 && (
-          <p className="text-xs text-yellow-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             No protection wallets registered. Add one in Settings first.
           </p>
         )}
@@ -305,28 +335,30 @@ export function PoolForm() {
 
       {/* Toggles */}
       <div className="flex items-center gap-6">
-        <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-2">
+          <Switch
+            id="profit-wallet-new"
             checked={form.profitWalletEnabled}
-            onChange={(e) => setForm((f) => ({ ...f, profitWalletEnabled: e.target.checked }))}
-            className="rounded bg-muted border-border"
+            onCheckedChange={(checked) => setForm((f) => ({ ...f, profitWalletEnabled: checked }))}
           />
-          Mirror on profit wallet
-        </label>
-        <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
-          <input
-            type="checkbox"
+          <Label htmlFor="profit-wallet-new" className="cursor-pointer">
+            Mirror on profit wallet
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="protection-active-new"
             checked={form.protectionActive}
-            onChange={(e) => setForm((f) => ({ ...f, protectionActive: e.target.checked }))}
-            className="rounded bg-muted border-border"
+            onCheckedChange={(checked) => setForm((f) => ({ ...f, protectionActive: checked }))}
           />
-          Protection active
-        </label>
+          <Label htmlFor="protection-active-new" className="cursor-pointer">
+            Protection active
+          </Label>
+        </div>
       </div>
 
       <Button className="w-full" disabled={submitting}>
-        {submitting ? 'Creating...' : 'Create Pool'}
+        {submitting ? 'Creating\u2026' : 'Create Pool'}
       </Button>
     </form>
   );

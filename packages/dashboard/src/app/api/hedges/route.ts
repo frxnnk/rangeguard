@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { hedgesRepo } from '../db';
+import { hedgesRepo, pnlRepo } from '../db';
 
 export async function GET(request: Request) {
   try {
@@ -7,18 +7,31 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const poolId = searchParams.get('poolId');
 
+    let hedges;
     if (poolId) {
-      // Return all hedges for a specific pool
-      const hedges = hedgesRepo.findByPool(poolId);
-      return NextResponse.json(hedges);
+      hedges = hedgesRepo.findByPool(poolId);
+    } else if (status === 'open') {
+      hedges = hedgesRepo.findOpen();
+    } else {
+      hedges = hedgesRepo.findOpen();
     }
 
-    if (status === 'open') {
-      return NextResponse.json(hedgesRepo.findOpen());
-    }
+    // Enrich open hedges with latest unrealized PnL from snapshots
+    const enriched = hedges.map((h) => {
+      if (h.status === 'open') {
+        const snapshots = pnlRepo.findByPool(h.poolConfigId, 1);
+        if (snapshots.length > 0) {
+          return {
+            ...h,
+            unrealizedPnl: snapshots[0].unrealizedPnl,
+            unrealizedPnlUpdatedAt: snapshots[0].snapshotAt,
+          };
+        }
+      }
+      return h;
+    });
 
-    // Return all open hedges by default
-    return NextResponse.json(hedgesRepo.findOpen());
+    return NextResponse.json(enriched);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch hedges' }, { status: 500 });
   }

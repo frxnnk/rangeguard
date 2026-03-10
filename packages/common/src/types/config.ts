@@ -20,6 +20,7 @@ export interface AppConfig {
   dashboard: {
     port: number;
   };
+  alertWebhookUrl?: string;
   logLevel: string;
 }
 

@@ -4,6 +4,19 @@
   "type": "module",
   "version": "0.1.0",
   "description": "Hedging bot for concentrated liquidity pools with Hyperliquid DEX",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/frxnnk/trading-bot-cgr"
+  },
+  "keywords": [
+    "trading-bot",
+    "uniswap",
+    "hyperliquid",
+    "hedging",
+    "impermanent-loss"
+  ],
+  "author": "frxnnk",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "dev:bot": "pnpm --filter @trading-bot/bot dev",
     "dev:dashboard": "pnpm --filter @trading-bot/dashboard dev",

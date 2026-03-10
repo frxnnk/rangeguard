@@ -3,11 +3,28 @@ services:
     build:
       context: .
       target: bot
+    init: true
     volumes:
       - bot-data:/app/data
-      - vault-data:/root/.trading-bot-cgr
+      - vault-data:/home/botuser/.trading-bot-cgr
     env_file: .env
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "const fs=require('fs');const s=fs.statSync('/app/data/bot.db');process.exit(Date.now()-s.mtimeMs>120000?1:0)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   dashboard:
     build:
@@ -19,8 +36,25 @@ services:
       - bot-data:/app/data
     env_file: .env
     depends_on:
-      - bot
+      bot:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://localhost:3000/api/bot-status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 volumes:
   bot-data:

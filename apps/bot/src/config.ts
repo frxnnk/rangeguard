@@ -32,6 +32,7 @@ export function loadConfig(): AppConfig {
     dashboard: {
       port: parseInt(process.env.DASHBOARD_PORT || '3000'),
     },
+    alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || undefined,
     logLevel: process.env.LOG_LEVEL || 'info',
   };
 }

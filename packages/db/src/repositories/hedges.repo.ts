@@ -121,6 +121,14 @@ export class HedgesRepository {
     return rows.map(rowToHedgeTrade);
   }
 
+  findOpenByWallet(walletId: string): HedgeTrade[] {
+    const stmt = this.db.prepare(
+      "SELECT * FROM hedge_trades WHERE wallet_id = ? AND status = 'open' ORDER BY opened_at DESC",
+    );
+    const rows = stmt.all(walletId) as HedgeTradeRow[];
+    return rows.map(rowToHedgeTrade);
+  }
+
   findOpenByPool(poolConfigId: string): HedgeTrade[] {
     const stmt = this.db.prepare(
       "SELECT * FROM hedge_trades WHERE pool_config_id = ? AND status = 'open' ORDER BY opened_at DESC",
@@ -135,6 +143,7 @@ export class HedgesRepository {
     realizedPnl: string,
     closeReason: CloseReason,
     isFalseBreakout: boolean,
+    closeFees?: string,
   ): void {
     const now = Date.now();
     const status = closeReason === 'liquidated' ? 'liquidated' : 'closed';
@@ -146,11 +155,21 @@ export class HedgesRepository {
         realized_pnl = ?,
         close_reason = ?,
         is_false_breakout = ?,
-        closed_at = ?
+        closed_at = ?,
+        fees = CAST(CAST(fees AS REAL) + ? AS TEXT)
       WHERE id = ?
     `);
 
-    stmt.run(status, exitPrice, realizedPnl, closeReason, isFalseBreakout ? 1 : 0, now, id);
+    stmt.run(
+      status,
+      exitPrice,
+      realizedPnl,
+      closeReason,
+      isFalseBreakout ? 1 : 0,
+      now,
+      parseFloat(closeFees ?? '0'),
+      id,
+    );
   }
 
   findHistory(limit: number, offset: number): HedgeTrade[] {

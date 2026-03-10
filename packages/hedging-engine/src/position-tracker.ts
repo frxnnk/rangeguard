@@ -1,5 +1,5 @@
 import { createLogger } from '@trading-bot/common';
-import type { HedgeTrade, PoolConfig } from '@trading-bot/common';
+import type { HedgeTrade } from '@trading-bot/common';
 import type { HedgesRepository } from '@trading-bot/db';
 
 const logger = createLogger('position-tracker');
@@ -38,6 +38,7 @@ export class PositionTracker {
     entryPrice: string,
     leverage: number,
     hlOrderId?: string,
+    fees?: string,
   ): HedgeTrade {
     const trade = this.hedgesRepo.create({
       poolConfigId,
@@ -48,9 +49,10 @@ export class PositionTracker {
       size,
       entryPrice,
       leverage,
+      fees,
       hlOrderId,
     });
-    logger.info({ tradeId: trade.id, poolConfigId, side, size }, 'Hedge trade recorded');
+    logger.info({ tradeId: trade.id, poolConfigId, side, size, fees }, 'Hedge trade recorded');
     return trade;
   }
 
@@ -61,10 +63,11 @@ export class PositionTracker {
     realizedPnl: string,
     closeReason: 'range_return' | 'manual' | 'liquidated',
     isFalseBreakout: boolean,
+    closeFees?: string,
   ): void {
-    this.hedgesRepo.close(tradeId, exitPrice, realizedPnl, closeReason, isFalseBreakout);
+    this.hedgesRepo.close(tradeId, exitPrice, realizedPnl, closeReason, isFalseBreakout, closeFees);
     logger.info(
-      { tradeId, exitPrice, realizedPnl, closeReason, isFalseBreakout },
+      { tradeId, exitPrice, realizedPnl, closeReason, isFalseBreakout, closeFees },
       'Hedge trade closed',
     );
   }

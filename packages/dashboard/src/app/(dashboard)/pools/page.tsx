@@ -1,10 +1,13 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { PoolCard } from '@/components/pools/PoolCard';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Layers } from 'lucide-react';
 
 export default function PoolsPage() {
   const queryClient = useQueryClient();
@@ -21,12 +24,20 @@ export default function PoolsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active }),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pools'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      toast.success('Protection toggled');
+    },
+    onError: () => toast.error('Failed to toggle protection'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => fetch(`/api/pools/${id}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pools'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pools'] });
+      toast.success('Pool deleted');
+    },
+    onError: () => toast.error('Failed to delete pool'),
   });
 
   return (
@@ -45,12 +56,15 @@ export default function PoolsPage() {
           ))}
         </div>
       ) : pools.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">No pools configured yet.</p>
-          <Button variant="link" asChild>
-            <Link href="/pools/new">Add your first pool</Link>
-          </Button>
-        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Layers className="size-10 text-muted-foreground mb-3" aria-hidden="true" />
+            <p className="text-muted-foreground mb-4">No pools configured yet.</p>
+            <Button asChild>
+              <Link href="/pools/new">Add your first pool</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4">
           {pools.map((pool: any) => (

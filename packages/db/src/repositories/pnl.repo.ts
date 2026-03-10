@@ -109,4 +109,18 @@ export class PnlRepository {
       recordedAt: row.recorded_at,
     }));
   }
+
+  /** Delete price_cache entries older than the given timestamp */
+  cleanupPriceCache(olderThan: number): number {
+    const stmt = this.db.prepare('DELETE FROM price_cache WHERE recorded_at < ? AND asset != ?');
+    const result = stmt.run(olderThan, '__bot_heartbeat');
+    return result.changes;
+  }
+
+  /** Delete pnl_snapshots entries older than the given timestamp */
+  cleanupPnlSnapshots(olderThan: number): number {
+    const stmt = this.db.prepare('DELETE FROM pnl_snapshots WHERE snapshot_at < ?');
+    const result = stmt.run(olderThan);
+    return result.changes;
+  }
 }
