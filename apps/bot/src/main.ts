@@ -188,6 +188,7 @@ async function main() {
 
   // 14. Start monitoring active pools
   const watchedPoolIds = new Set<string>();
+  const poolRangeCache = new Map<string, string>(); // poolId -> "lower:upper:direction"
 
   const syncPools = async () => {
     const activePools = poolsRepo.findActive();
@@ -195,11 +196,32 @@ async function main() {
 
     // Add newly activated pools
     for (const pool of activePools) {
+      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}`;
+
       if (!watchedPoolIds.has(pool.id)) {
         rangeDetector.register(pool);
         await poolWatcher.watch(pool);
         watchedPoolIds.add(pool.id);
+        poolRangeCache.set(pool.id, rangeKey);
         logger.info({ poolConfigId: pool.id, name: pool.name }, 'Pool added to monitoring');
+      } else if (poolRangeCache.get(pool.id) !== rangeKey) {
+        // Range parameters changed in DB — update the detector
+        rangeDetector.updateConfig(
+          pool.id,
+          pool.rangeLower,
+          pool.rangeUpper,
+          pool.protectionDirection,
+        );
+        poolRangeCache.set(pool.id, rangeKey);
+        logger.info(
+          {
+            poolConfigId: pool.id,
+            rangeLower: pool.rangeLower,
+            rangeUpper: pool.rangeUpper,
+            direction: pool.protectionDirection,
+          },
+          'Range parameters updated from DB',
+        );
       }
     }
 
@@ -209,6 +231,7 @@ async function main() {
         poolWatcher.unwatch(id);
         rangeDetector.unregister(id);
         watchedPoolIds.delete(id);
+        poolRangeCache.delete(id);
         logger.info({ poolConfigId: id }, 'Pool removed from monitoring');
       }
     }

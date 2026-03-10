@@ -49,8 +49,14 @@ export class HyperliquidClient {
   /** Initialize a wallet client from a private key */
   addWallet(walletId: string, alias: string, privateKey: string): void {
     const account = privateKeyToAccount(privateKey as `0x${string}`);
-    const transport = new hl.HttpTransport({ isTestnet: this.isTestnet });
-    const walletClient = new hl.WalletClient({ wallet: account, transport });
+    const transport = new hl.HttpTransport({
+      url: this.isTestnet ? 'https://hyperliquid-testnet.xyz' : 'https://hyperliquid.xyz',
+    });
+    const walletClient = new hl.WalletClient({
+      wallet: account,
+      transport,
+      isTestnet: this.isTestnet,
+    });
 
     this.clients.set(walletId, {
       alias,
