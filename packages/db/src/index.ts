@@ -5,3 +5,4 @@ export { WalletsRepository } from './repositories/wallets.repo.js';
 export { HedgesRepository } from './repositories/hedges.repo.js';
 export { TradeLogRepository } from './repositories/trade-log.repo.js';
 export { PnlRepository } from './repositories/pnl.repo.js';
+export { SettingsRepository } from './repositories/settings.repo.js';

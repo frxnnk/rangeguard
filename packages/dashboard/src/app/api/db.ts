@@ -7,6 +7,7 @@ import {
   HedgesRepository,
   TradeLogRepository,
   PnlRepository,
+  SettingsRepository,
 } from '@trading-bot/db';
 
 // Resolve DB path to monorepo root so dashboard and bot share the same database.
@@ -22,3 +23,4 @@ export const walletsRepo = new WalletsRepository(db);
 export const hedgesRepo = new HedgesRepository(db);
 export const tradeLogRepo = new TradeLogRepository(db);
 export const pnlRepo = new PnlRepository(db);
+export const settingsRepo = new SettingsRepository(db);

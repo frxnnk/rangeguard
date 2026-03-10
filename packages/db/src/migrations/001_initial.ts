@@ -100,5 +100,11 @@ export function runMigrations(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_trade_log_hedge ON trade_log(hedge_trade_id);
     CREATE INDEX IF NOT EXISTS idx_pnl_snapshots_pool ON pnl_snapshots(pool_config_id);
     CREATE INDEX IF NOT EXISTS idx_price_cache_asset ON price_cache(asset, recorded_at);
+
+    CREATE TABLE IF NOT EXISTS bot_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+    );
   `);
 }
