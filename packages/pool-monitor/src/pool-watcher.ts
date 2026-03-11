@@ -4,13 +4,15 @@ import {
   UNISWAP_V3_POOL_ABI,
   sqrtPriceX96ToPrice,
   createLogger,
-} from '@trading-bot/common';
-import type { PriceUpdate } from '@trading-bot/common';
+} from '@rangeguard/common';
+import type { PriceUpdate } from '@rangeguard/common';
 import type { ChainClientManager } from './chain-client.js';
 
 const logger = createLogger('pool-watcher');
 
 type PriceCallback = (update: PriceUpdate) => void;
+
+export type PriceSource = 'ws' | 'polling';
 
 interface WatcherHandle {
   poolAddress: string;
@@ -18,6 +20,7 @@ interface WatcherHandle {
   unwatch?: () => void;
   pollingTimer?: ReturnType<typeof setInterval>;
   subscribers: Set<string>; // pool config IDs using this watcher
+  source: PriceSource;
 }
 
 export class PoolWatcher {
@@ -34,6 +37,13 @@ export class PoolWatcher {
     this.clientManager = clientManager;
     this.callback = callback;
     this.pollingIntervalMs = pollingIntervalMs;
+
+    // Listen for WS reconnections to auto-upgrade polling → WS
+    this.clientManager.onWsStatusChange((chainId, status) => {
+      if (status === 'connected') {
+        this.upgradeToWs(chainId);
+      }
+    });
   }
 
   /** Start watching a pool. Shares watcher if same pool address on same chain. */
@@ -51,58 +61,102 @@ export class PoolWatcher {
       poolAddress: config.poolAddress,
       chainId: config.chainId,
       subscribers: new Set([config.id]),
+      source: 'polling',
     };
 
     // Try WebSocket subscription first
-    const wsClient = this.clientManager.getWsClient(config.chainId);
-    if (wsClient) {
-      try {
-        handle.unwatch = wsClient.watchContractEvent({
-          address: config.poolAddress as `0x${string}`,
-          abi: UNISWAP_V3_POOL_ABI,
-          eventName: 'Swap',
-          onLogs: (logs) => {
-            for (const log of logs) {
-              const args = log.args as {
-                sqrtPriceX96: bigint;
-                tick: number;
-              };
-              if (!args.sqrtPriceX96) continue;
-
-              const price = sqrtPriceX96ToPrice(args.sqrtPriceX96);
-
-              // Emit for each subscriber of this pool
-              for (const configId of handle.subscribers) {
-                this.callback({
-                  poolConfigId: configId,
-                  poolAddress: config.poolAddress,
-                  chainId: config.chainId,
-                  currentPrice: price.toString(),
-                  tick: Number(args.tick),
-                  sqrtPriceX96: args.sqrtPriceX96,
-                  timestamp: Date.now(),
-                });
-              }
-            }
-          },
-          onError: (error) => {
-            logger.error({ key, error: error.message }, 'WebSocket error, falling back to polling');
-            handle.unwatch = undefined;
-            this.startPolling(handle, config);
-          },
-        });
-
-        logger.info({ key }, 'WebSocket subscription active');
-        this.watchers.set(key, handle);
-        return;
-      } catch (error) {
-        logger.warn({ key, error }, 'Failed to start WebSocket, falling back to polling');
-      }
+    if (this.tryStartWs(handle, config)) {
+      this.watchers.set(key, handle);
+      return;
     }
 
     // Fallback: polling slot0
     this.startPolling(handle, config);
     this.watchers.set(key, handle);
+  }
+
+  /** Attempt to start a WS subscription for a handle. Returns true on success. */
+  private tryStartWs(handle: WatcherHandle, config: PoolConfig): boolean {
+    const wsClient = this.clientManager.getWsClient(config.chainId);
+    if (!wsClient) return false;
+
+    const key = `${config.chainId}:${config.poolAddress.toLowerCase()}`;
+
+    try {
+      handle.unwatch = wsClient.watchContractEvent({
+        address: config.poolAddress as `0x${string}`,
+        abi: UNISWAP_V3_POOL_ABI,
+        eventName: 'Swap',
+        onLogs: (logs) => {
+          for (const log of logs) {
+            const args = log.args as {
+              sqrtPriceX96: bigint;
+              tick: number;
+            };
+            if (!args.sqrtPriceX96) continue;
+
+            const price = sqrtPriceX96ToPrice(args.sqrtPriceX96);
+
+            // Emit for each subscriber of this pool
+            for (const configId of handle.subscribers) {
+              this.callback({
+                poolConfigId: configId,
+                poolAddress: config.poolAddress,
+                chainId: config.chainId,
+                currentPrice: price.toString(),
+                tick: Number(args.tick),
+                sqrtPriceX96: args.sqrtPriceX96,
+                timestamp: Date.now(),
+              });
+            }
+          }
+        },
+        onError: (error) => {
+          logger.error({ key, error: error.message }, 'WebSocket error, falling back to polling');
+          handle.unwatch = undefined;
+          handle.source = 'polling';
+          this.clientManager.notifyWsDropped(config.chainId);
+          this.startPolling(handle, config);
+        },
+      });
+
+      handle.source = 'ws';
+      logger.info({ key }, 'WebSocket subscription active');
+      return true;
+    } catch (error) {
+      logger.warn({ key, error }, 'Failed to start WebSocket, falling back to polling');
+      return false;
+    }
+  }
+
+  /**
+   * Auto-upgrade all polling watchers on a chain to WebSocket after reconnect.
+   * Called when ChainClientManager emits a 'connected' status for a chain.
+   */
+  private upgradeToWs(chainId: number): void {
+    for (const [key, handle] of this.watchers) {
+      if (handle.chainId !== chainId || handle.source === 'ws') continue;
+
+      // Build a minimal PoolConfig for tryStartWs
+      const configProxy: PoolConfig = {
+        id: handle.subscribers.values().next().value!,
+        poolAddress: handle.poolAddress,
+        chainId: handle.chainId,
+      } as PoolConfig;
+
+      // Stop polling before attempting WS
+      if (handle.pollingTimer) {
+        clearInterval(handle.pollingTimer);
+        handle.pollingTimer = undefined;
+      }
+
+      if (this.tryStartWs(handle, configProxy)) {
+        logger.info({ key }, 'Upgraded from polling to WebSocket');
+      } else {
+        // WS failed again — restart polling
+        this.startPolling(handle, configProxy);
+      }
+    }
   }
 
   private startPolling(handle: WatcherHandle, config: PoolConfig): void {
@@ -139,6 +193,7 @@ export class PoolWatcher {
     // Initial poll
     poll();
     handle.pollingTimer = setInterval(poll, this.pollingIntervalMs);
+    handle.source = 'polling';
     logger.info(
       { poolAddress: handle.poolAddress, intervalMs: this.pollingIntervalMs },
       'Polling started',
@@ -171,5 +226,14 @@ export class PoolWatcher {
   /** Get number of active watchers */
   get activeCount(): number {
     return this.watchers.size;
+  }
+
+  /** Get price source for each watcher (for monitoring/dashboard) */
+  getSources(): Map<string, PriceSource> {
+    const result = new Map<string, PriceSource>();
+    for (const [key, handle] of this.watchers) {
+      result.set(key, handle.source);
+    }
+    return result;
   }
 }

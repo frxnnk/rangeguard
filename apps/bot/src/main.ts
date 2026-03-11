@@ -1,4 +1,6 @@
-import { createLogger, sendAlert } from '@trading-bot/common';
+import { resolve } from 'path';
+import { existsSync } from 'fs';
+import { createLogger, setLogSink, sendAlert } from '@rangeguard/common';
 import {
   getDatabase,
   closeDatabase,
@@ -10,23 +12,25 @@ import {
   PnlRepository,
   StopLossRepository,
   RangeTradesRepository,
-} from '@trading-bot/db';
-import { Vault, KeyManager } from '@trading-bot/security';
+  SettingsRepository,
+  LogsRepository,
+} from '@rangeguard/db';
+import { Vault, KeyManager } from '@rangeguard/security';
 import {
   ChainClientManager,
   PoolWatcher,
   RangeDetector,
   PriceFeed,
-} from '@trading-bot/pool-monitor';
+} from '@rangeguard/pool-monitor';
 import {
   HedgingEngine,
   HyperliquidClient,
   DryRunClient,
   WalletMonitor,
   RangeTradingEngine,
-} from '@trading-bot/hedging-engine';
+} from '@rangeguard/hedging-engine';
 import { TypedEventBus } from './event-bus.js';
-import { loadConfig } from './config.js';
+import { loadConfig, applyDbOverrides, monorepoRoot } from './config.js';
 
 const logger = createLogger('bot');
 let lastPriceLogAt = 0;
@@ -50,11 +54,33 @@ async function main() {
     setTimeout(() => process.exit(1), 2000);
   });
 
-  logger.info('Starting Trading Bot...');
-
   // 1. Load configuration
-  const config = loadConfig();
+  let config = loadConfig();
   const webhookUrl = config.alertWebhookUrl;
+
+  logger.info(
+    {
+      env: config.env,
+      dbPath: config.db.path,
+      vaultPath: config.vault.path,
+      hlApi: config.hyperliquid.apiUrl,
+      dryRun: config.dryRun,
+    },
+    `RangeGuard starting in ${config.env.toUpperCase()} mode`,
+  );
+
+  if (config.env === 'mainnet') {
+    logger.warn('=== MAINNET MODE — real funds at risk ===');
+  }
+
+  // Warn if old non-env-specific DB exists but new one doesn't
+  const oldDbPath = resolve(monorepoRoot, 'data', 'bot.db');
+  if (existsSync(oldDbPath) && !existsSync(config.db.path) && config.db.path !== oldDbPath) {
+    logger.warn(
+      { oldPath: oldDbPath, newPath: config.db.path },
+      `Found old bot.db — rename it to migrate: mv data/bot.db data/bot-${config.env}.db`,
+    );
+  }
 
   // Log warnings for missing config
   if (!config.vault.password) {
@@ -63,14 +89,32 @@ async function main() {
   if (!webhookUrl) {
     logger.warn('No ALERT_WEBHOOK_URL set — no external alerts will be sent');
   }
-  if (config.hyperliquid.apiUrl.includes('testnet')) {
-    logger.warn('Using Hyperliquid TESTNET — not mainnet');
-  }
 
   // 2. Initialize database
   const db = getDatabase(config.db.path);
   runMigrations(db);
   logger.info('Database initialized');
+
+  // 2b. Apply DB settings overrides (DB > .env > defaults)
+  const settingsRepo = new SettingsRepository(db);
+  config = applyDbOverrides(config, settingsRepo);
+  logger.info(
+    {
+      debounceCount: config.monitoring.debounceCount,
+      pollingMs: config.monitoring.pollingIntervalMs,
+      walletCheckMs: config.monitoring.walletCheckIntervalMs,
+      cooldownMin: config.monitoring.cooldownMinutes,
+      hlApi: config.hyperliquid.apiUrl,
+      logLevel: config.logLevel,
+    },
+    'Config loaded (DB overrides applied)',
+  );
+
+  // 2c. Set up DB log sink (all loggers will now also write to bot_logs table)
+  const logsRepo = new LogsRepository(db);
+  setLogSink((level, name, msg, data) => {
+    logsRepo.insert(level, name, msg, data);
+  });
 
   // 3. Initialize repositories
   const poolsRepo = new PoolsRepository(db);
@@ -95,6 +139,18 @@ async function main() {
   // 6. Initialize chain clients
   const chainClients = new ChainClientManager(config.rpc);
 
+  // Log WS connection status changes + alert on disconnect
+  chainClients.onWsStatusChange((chainId, status) => {
+    if (status === 'connected') {
+      logger.info({ chainId }, 'WebSocket connected');
+    } else if (status === 'disconnected') {
+      logger.warn({ chainId }, 'WebSocket disconnected — falling back to polling');
+      alert(webhookUrl, `⚠️ Chain ${chainId} WebSocket disconnected — using HTTP polling fallback`);
+    } else if (status === 'reconnecting') {
+      logger.info({ chainId }, 'WebSocket reconnecting...');
+    }
+  });
+
   // 7. Initialize Hyperliquid client and load wallet keys
   // DryRunClient is a structural drop-in for HyperliquidClient — cast so
   // the rest of the code (engine, wallet monitor, etc.) accepts it unchanged.
@@ -113,6 +169,15 @@ async function main() {
       hlClient.addWallet(wallet.id, wallet.alias, keyManager.getPrivateKey(wallet.alias));
     } else {
       logger.warn({ walletId: wallet.id, alias: wallet.alias }, 'No key found in vault for wallet');
+    }
+  }
+
+  // 7b. Pre-load asset index cache (avoids lazy resolve on first hedge)
+  if (!config.dryRun) {
+    try {
+      await hlClient.preloadAssetMeta();
+    } catch (error) {
+      logger.warn({ error }, 'Failed to preload asset meta — will resolve lazily');
     }
   }
 
@@ -171,6 +236,8 @@ async function main() {
   );
 
   // 11. Initialize pool watcher
+  const statusThrottle = new Map<string, { lastState: string; lastWriteAt: number }>();
+
   const poolWatcher = new PoolWatcher(
     chainClients,
     (update) => {
@@ -195,35 +262,56 @@ async function main() {
       // Feed range trading engine (R10)
       rangeTradingEngine.onPriceUpdate(update.poolConfigId, price);
 
-      // Update current price in DB periodically
-      poolsRepo.updateStatus(
-        update.poolConfigId,
-        rangeDetector.getState(update.poolConfigId) || 'in-range',
-        update.currentPrice,
-      );
+      // Update current price in DB — throttled: only on state change or every 30s
+      const currentState = rangeDetector.getState(update.poolConfigId) || 'in-range';
+      const throttle = statusThrottle.get(update.poolConfigId);
+      const stateChanged = !throttle || throttle.lastState !== currentState;
+      const stale = !throttle || now - throttle.lastWriteAt >= 30_000;
+
+      if (stateChanged || stale) {
+        poolsRepo.updateStatus(update.poolConfigId, currentState, update.currentPrice);
+        statusThrottle.set(update.poolConfigId, { lastState: currentState, lastWriteAt: now });
+      }
     },
     config.monitoring.pollingIntervalMs,
   );
 
-  // 12. Wire event handlers
+  // 12. Wire event handlers (with per-wallet mutex to prevent race conditions)
+  const walletLocks = new Map<string, Promise<void>>();
+
+  function withWalletLock(walletId: string, fn: () => Promise<void>): Promise<void> {
+    const prev = walletLocks.get(walletId) ?? Promise.resolve();
+    const next = prev.then(fn, fn);
+    walletLocks.set(walletId, next);
+    return next;
+  }
+
   eventBus.on('range-exit', async (event) => {
-    try {
-      await engine.onRangeExit(event);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error({ error, event }, 'Error handling range exit');
-      alert(webhookUrl, `🔴 Hedge open FAILED for pool ${event.poolConfigId}: ${msg}`);
-    }
+    const poolConfig = poolsRepo.findById(event.poolConfigId);
+    const walletId = poolConfig?.protectionWalletId ?? event.poolConfigId;
+    await withWalletLock(walletId, async () => {
+      try {
+        await engine.onRangeExit(event);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error({ error, event }, 'Error handling range exit');
+        alert(webhookUrl, `🔴 Hedge open FAILED for pool ${event.poolConfigId}: ${msg}`);
+      }
+    });
   });
 
   eventBus.on('range-return', async (event) => {
-    try {
-      await engine.onRangeReturn(event);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.error({ error, event }, 'Error handling range return');
-      alert(webhookUrl, `🔴 Hedge close FAILED for pool ${event.poolConfigId}: ${msg}`);
-    }
+    const poolConfig = poolsRepo.findById(event.poolConfigId);
+    const walletId = poolConfig?.protectionWalletId ?? event.poolConfigId;
+    await withWalletLock(walletId, async () => {
+      try {
+        await engine.onRangeReturn(event);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error({ error, event }, 'Error handling range return');
+        alert(webhookUrl, `🔴 Hedge close FAILED for pool ${event.poolConfigId}: ${msg}`);
+      }
+    });
   });
 
   eventBus.on('hedge-opened', (event) => {
@@ -356,6 +444,7 @@ async function main() {
       }
     },
     pnlRepo,
+    rangeTradesRepo,
   );
 
   // 14. Start monitoring active pools
@@ -368,7 +457,7 @@ async function main() {
 
     // Add newly activated pools
     for (const pool of activePools) {
-      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}:${pool.tradingEnabled}:${pool.tradingEntryZonePercent}:${pool.tradingCooldownSeconds}`;
+      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}:${pool.hedgeRatio}:${pool.hedgeCooldownSeconds}:${pool.debounceCount}:${pool.tradingEnabled}:${pool.tradingEntryZonePercent}:${pool.tradingCooldownSeconds}:${pool.leverage}:${pool.tradingLeverage}`;
 
       if (!watchedPoolIds.has(pool.id)) {
         rangeDetector.register(pool);
@@ -377,6 +466,13 @@ async function main() {
         watchedPoolIds.add(pool.id);
         poolRangeCache.set(pool.id, rangeKey);
         logger.info({ poolConfigId: pool.id, name: pool.name }, 'Pool added to monitoring');
+
+        // Pre-set leverage fire-and-forget (removes API call from hot path)
+        if (hlClient.hasWallet(pool.protectionWalletId)) {
+          hlClient
+            .presetLeverage(pool.protectionWalletId, pool.hedgeAsset, pool.leverage)
+            .catch((err) => logger.warn({ poolId: pool.id, err }, 'Failed to pre-set leverage'));
+        }
       } else if (poolRangeCache.get(pool.id) !== rangeKey) {
         // Range parameters changed in DB — update the detectors
         rangeDetector.updateConfig(
@@ -384,6 +480,8 @@ async function main() {
           pool.rangeLower,
           pool.rangeUpper,
           pool.protectionDirection,
+          pool.hedgeCooldownSeconds,
+          pool.debounceCount,
         );
         rangeTradingEngine.updateConfig(pool);
         poolRangeCache.set(pool.id, rangeKey);
@@ -416,14 +514,27 @@ async function main() {
   await syncPools();
   logger.info({ count: watchedPoolIds.size }, 'Active pools loaded');
 
-  // Re-sync pools every 30s to detect dashboard changes
+  // Log price source per watcher (WS vs polling)
+  const sources = poolWatcher.getSources();
+  for (const [key, source] of sources) {
+    logger.info({ watcher: key, source }, 'Price source');
+  }
+  const wsCount = [...sources.values()].filter((s) => s === 'ws').length;
+  const pollingCount = sources.size - wsCount;
+  if (pollingCount > 0 && wsCount === 0) {
+    logger.warn(
+      'All watchers using HTTP polling — set WS_ARBITRUM/WS_ETHEREUM env vars for lower latency',
+    );
+  }
+
+  // Re-sync pools every 10s to detect dashboard changes
   const poolSyncInterval = setInterval(async () => {
     try {
       await syncPools();
     } catch (error) {
       logger.error({ error }, 'Failed to sync pools');
     }
-  }, 30_000);
+  }, 10_000);
 
   // 15. Start wallet monitor
   walletMonitor.start();
@@ -446,6 +557,7 @@ async function main() {
         const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
         pnlRepo.cleanupPriceCache(sevenDaysAgo);
         pnlRepo.cleanupPnlSnapshots(ninetyDaysAgo);
+        logsRepo.cleanup(sevenDaysAgo);
       } catch (error) {
         logger.warn({ error }, 'DB cleanup failed');
       }
