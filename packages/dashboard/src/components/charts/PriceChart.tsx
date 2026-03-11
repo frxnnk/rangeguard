@@ -27,7 +27,7 @@ interface PriceChartProps {
 
 export function PriceChart({ data, rangeLower, rangeUpper }: PriceChartProps) {
   if (data.length === 0) {
-    return <div className="text-muted-foreground text-center py-8">No price data</div>;
+    return <div className="text-muted-foreground text-center py-8">Sin datos de precio</div>;
   }
 
   return (
@@ -48,7 +48,7 @@ export function PriceChart({ data, rangeLower, rangeUpper }: PriceChartProps) {
             y={rangeLower}
             stroke={CHART_COLORS.destructive}
             strokeDasharray="3 3"
-            label={{ value: 'Lower', fill: CHART_COLORS.destructive, fontSize: 11 }}
+            label={{ value: 'Inferior', fill: CHART_COLORS.destructive, fontSize: 11 }}
           />
         )}
         {rangeUpper && (
@@ -56,7 +56,7 @@ export function PriceChart({ data, rangeLower, rangeUpper }: PriceChartProps) {
             y={rangeUpper}
             stroke={CHART_COLORS.destructive}
             strokeDasharray="3 3"
-            label={{ value: 'Upper', fill: CHART_COLORS.destructive, fontSize: 11 }}
+            label={{ value: 'Superior', fill: CHART_COLORS.destructive, fontSize: 11 }}
           />
         )}
         <Area

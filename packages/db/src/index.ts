@@ -8,3 +8,4 @@ export { PnlRepository } from './repositories/pnl.repo.js';
 export { SettingsRepository } from './repositories/settings.repo.js';
 export { StopLossRepository } from './repositories/stop-loss.repo.js';
 export type { StopLossOrder } from './repositories/stop-loss.repo.js';
+export { RangeTradesRepository } from './repositories/range-trades.repo.js';

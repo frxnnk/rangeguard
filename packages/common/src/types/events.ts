@@ -46,6 +46,26 @@ export interface HedgeClosedEvent {
   timestamp: number;
 }
 
+// Range trading events (R10)
+export interface RangeTradeOpenedEvent {
+  rangeTradeId: string;
+  poolConfigId: string;
+  walletId: string;
+  side: 'short' | 'long';
+  size: string;
+  entryPrice: string;
+  timestamp: number;
+}
+
+export interface RangeTradeClosedEvent {
+  rangeTradeId: string;
+  poolConfigId: string;
+  walletId: string;
+  realizedPnl: string;
+  closeReason: string;
+  timestamp: number;
+}
+
 export interface WalletBalanceUpdate {
   walletId: string;
   alias: string;
@@ -62,4 +82,6 @@ export type BotEvent =
   | { type: 'range-return'; data: RangeReturnEvent }
   | { type: 'hedge-opened'; data: HedgeOpenedEvent }
   | { type: 'hedge-closed'; data: HedgeClosedEvent }
+  | { type: 'range-trade-opened'; data: RangeTradeOpenedEvent }
+  | { type: 'range-trade-closed'; data: RangeTradeClosedEvent }
   | { type: 'wallet-balance'; data: WalletBalanceUpdate };

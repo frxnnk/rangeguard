@@ -71,21 +71,21 @@ export function PoolCard({ pool, onToggle, onDelete }: PoolCardProps) {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
           <div>
-            <p className="text-xs text-muted-foreground">Pool Amount</p>
+            <p className="text-xs text-muted-foreground">Monto del Pool</p>
             <p className="text-sm font-medium text-foreground">
               ${parseFloat(pool.poolAmount).toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Hedge Asset</p>
+            <p className="text-xs text-muted-foreground">Activo de Cobertura</p>
             <p className="text-sm font-medium text-foreground">{pool.hedgeAsset}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Leverage</p>
+            <p className="text-xs text-muted-foreground">Apalancamiento</p>
             <p className="text-sm font-medium text-foreground">{pool.leverage}x</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Direction</p>
+            <p className="text-xs text-muted-foreground">Dirección</p>
             <p className="text-sm font-medium text-foreground capitalize">
               {pool.protectionDirection}
             </p>
@@ -96,7 +96,7 @@ export function PoolCard({ pool, onToggle, onDelete }: PoolCardProps) {
       {currentPrice !== undefined && (
         <CardContent>
           <div className="pt-3 border-t border-border">
-            <p className="text-xs text-muted-foreground">Current Price</p>
+            <p className="text-xs text-muted-foreground">Precio Actual</p>
             <p className="text-lg font-mono font-bold text-foreground">
               $
               {currentPrice.toLocaleString(undefined, {
@@ -110,20 +110,20 @@ export function PoolCard({ pool, onToggle, onDelete }: PoolCardProps) {
 
       <CardFooter className="justify-between border-t pt-4">
         <Button variant="link" asChild className="h-auto p-0 text-xs">
-          <Link href={`/pools/${pool.id}`}>View details</Link>
+          <Link href={`/pools/${pool.id}`}>Ver detalles</Link>
         </Button>
         <Button
           variant="link"
           className="h-auto p-0 text-xs text-destructive"
           onClick={() => {
             if (
-              confirm(`Delete pool "${pool.name || `${pool.token0Symbol}/${pool.token1Symbol}`}"?`)
+              confirm(`¿Eliminar pool "${pool.name || `${pool.token0Symbol}/${pool.token1Symbol}`}"?`)
             ) {
               onDelete(pool.id);
             }
           }}
         >
-          Delete pool
+          Eliminar pool
         </Button>
       </CardFooter>
     </Card>

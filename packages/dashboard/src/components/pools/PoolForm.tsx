@@ -136,7 +136,7 @@ export function PoolForm() {
       <div className="grid grid-cols-2 gap-4">
         {/* Chain */}
         <div className="space-y-2">
-          <Label>Network</Label>
+          <Label>Red</Label>
           <Select
             value={form.chainId.toString()}
             onValueChange={(value) => {
@@ -160,7 +160,7 @@ export function PoolForm() {
 
         {/* Pair */}
         <div className="space-y-2">
-          <Label>Pair</Label>
+          <Label>Par</Label>
           <Select
             value={form.pairIndex.toString()}
             onValueChange={(value) => setForm((f) => ({ ...f, pairIndex: parseInt(value) }))}
@@ -181,7 +181,7 @@ export function PoolForm() {
 
       {/* Pool Address */}
       <div className="space-y-2">
-        <Label>Pool Address</Label>
+        <Label>Dirección del Pool</Label>
         <Input
           type="text"
           value={form.poolAddress}
@@ -194,7 +194,7 @@ export function PoolForm() {
 
       {/* Fee Tier */}
       <div className="space-y-2">
-        <Label>Fee Tier</Label>
+        <Label>Nivel de Fee</Label>
         <Select
           value={form.feeTier.toString()}
           onValueChange={(value) => setForm((f) => ({ ...f, feeTier: parseInt(value) }))}
@@ -215,7 +215,7 @@ export function PoolForm() {
       {/* Range */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Range Lower ($)</Label>
+          <Label>Rango Inferior ($)</Label>
           <Input
             type="number"
             step="any"
@@ -227,7 +227,7 @@ export function PoolForm() {
           />
         </div>
         <div className="space-y-2">
-          <Label>Range Upper ($)</Label>
+          <Label>Rango Superior ($)</Label>
           <Input
             type="number"
             step="any"
@@ -242,7 +242,7 @@ export function PoolForm() {
 
       {/* Pool Amount */}
       <div className="space-y-2">
-        <Label>Pool Amount (USD)</Label>
+        <Label>Monto del Pool (USD)</Label>
         <Input
           type="number"
           step="any"
@@ -256,7 +256,7 @@ export function PoolForm() {
 
       {/* Name (optional) */}
       <div className="space-y-2">
-        <Label>Name (optional)</Label>
+        <Label>Nombre (opcional)</Label>
         <Input
           type="text"
           value={form.name}
@@ -269,7 +269,7 @@ export function PoolForm() {
       <div className="grid grid-cols-2 gap-4">
         {/* Leverage */}
         <div className="space-y-2">
-          <Label>Leverage</Label>
+          <Label>Apalancamiento</Label>
           <Select
             value={form.leverage.toString()}
             onValueChange={(value) => setForm((f) => ({ ...f, leverage: parseInt(value) }))}
@@ -286,7 +286,7 @@ export function PoolForm() {
 
         {/* Protection Direction */}
         <div className="space-y-2">
-          <Label>Protection Direction</Label>
+          <Label>Dirección de Protección</Label>
           <Select
             value={form.protectionDirection}
             onValueChange={(value) =>
@@ -300,9 +300,9 @@ export function PoolForm() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="below">Below only (Short)</SelectItem>
-              <SelectItem value="above">Above only (Long)</SelectItem>
-              <SelectItem value="both">Both directions</SelectItem>
+              <SelectItem value="below">Solo abajo (Short)</SelectItem>
+              <SelectItem value="above">Solo arriba (Long)</SelectItem>
+              <SelectItem value="both">Ambas direcciones</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -310,13 +310,13 @@ export function PoolForm() {
 
       {/* Protection Wallet */}
       <div className="space-y-2">
-        <Label>Protection Wallet</Label>
+        <Label>Wallet de Protección</Label>
         <Select
           value={form.protectionWalletId}
           onValueChange={(value) => setForm((f) => ({ ...f, protectionWalletId: value }))}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select wallet\u2026" />
+            <SelectValue placeholder="Seleccionar wallet\u2026" />
           </SelectTrigger>
           <SelectContent>
             {protectionWallets.map((w) => (
@@ -328,7 +328,7 @@ export function PoolForm() {
         </Select>
         {protectionWallets.length === 0 && (
           <p className="text-xs text-muted-foreground mt-1">
-            No protection wallets registered. Add one in Settings first.
+            No hay wallets de protección registradas. Agregá una primero.
           </p>
         )}
       </div>
@@ -342,7 +342,7 @@ export function PoolForm() {
             onCheckedChange={(checked) => setForm((f) => ({ ...f, profitWalletEnabled: checked }))}
           />
           <Label htmlFor="profit-wallet-new" className="cursor-pointer">
-            Mirror on profit wallet
+            Replicar en wallet de ganancia
           </Label>
         </div>
         <div className="flex items-center gap-2">
@@ -352,13 +352,13 @@ export function PoolForm() {
             onCheckedChange={(checked) => setForm((f) => ({ ...f, protectionActive: checked }))}
           />
           <Label htmlFor="protection-active-new" className="cursor-pointer">
-            Protection active
+            Protección activa
           </Label>
         </div>
       </div>
 
       <Button className="w-full" disabled={submitting}>
-        {submitting ? 'Creating\u2026' : 'Create Pool'}
+        {submitting ? 'Creando\u2026' : 'Crear Pool'}
       </Button>
     </form>
   );

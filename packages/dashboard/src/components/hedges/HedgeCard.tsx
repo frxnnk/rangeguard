@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60) return `hace ${seconds}s`;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.floor(minutes / 60)}h ago`;
+  if (minutes < 60) return `hace ${minutes}m`;
+  return `hace ${Math.floor(minutes / 60)}h`;
 }
 
 interface HedgeCardProps {
@@ -65,26 +65,26 @@ export function HedgeCard({ hedge }: HedgeCardProps) {
       <CardContent>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">Size</p>
+            <p className="text-xs text-muted-foreground">Tamaño</p>
             <p className="text-sm font-medium text-foreground">
               {parseFloat(hedge.size).toFixed(4)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Entry Price</p>
+            <p className="text-xs text-muted-foreground">Precio de Entrada</p>
             <p className="text-sm font-medium text-foreground">
               ${parseFloat(hedge.entryPrice).toLocaleString()}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Fees</p>
+            <p className="text-xs text-muted-foreground">Comisiones</p>
             <p className="text-sm font-medium text-foreground">
               ${parseFloat(hedge.fees).toFixed(2)}
             </p>
           </div>
           {hedge.unrealizedPnl && hedge.status === 'open' && (
             <div>
-              <p className="text-xs text-muted-foreground">Unrealized P&L</p>
+              <p className="text-xs text-muted-foreground">PnL No Realizado</p>
               <p
                 className={cn(
                   'text-sm font-medium',
@@ -97,7 +97,7 @@ export function HedgeCard({ hedge }: HedgeCardProps) {
           )}
           {hedge.realizedPnl && (
             <div>
-              <p className="text-xs text-muted-foreground">Realized P&L</p>
+              <p className="text-xs text-muted-foreground">PnL Realizado</p>
               <p
                 className={cn(
                   'text-sm font-medium',
@@ -112,11 +112,11 @@ export function HedgeCard({ hedge }: HedgeCardProps) {
 
         <div className="flex items-center justify-between mt-3">
           <p className="text-xs text-muted-foreground">
-            Opened {new Date(hedge.openedAt).toLocaleString()}
+            Abierto {new Date(hedge.openedAt).toLocaleString('es-AR')}
           </p>
           {hedge.unrealizedPnlUpdatedAt && hedge.status === 'open' && (
             <p className="text-xs text-muted-foreground">
-              Updated {formatTimeAgo(hedge.unrealizedPnlUpdatedAt)}
+              Actualizado {formatTimeAgo(hedge.unrealizedPnlUpdatedAt)}
             </p>
           )}
         </div>

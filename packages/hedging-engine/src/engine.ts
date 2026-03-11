@@ -25,6 +25,12 @@ export interface HedgeEventCallbacks {
   onHedgeClosed?: (event: HedgeClosedEvent) => void;
 }
 
+/** Interface to close range trades when hedge takes priority */
+export interface RangeTradingBridge {
+  forceClose(poolConfigId: string, currentPrice: number): Promise<void>;
+  hasOpenTrade(poolConfigId: string): boolean;
+}
+
 export class HedgingEngine {
   private poolsRepo: PoolsRepository;
   private walletsRepo: WalletsRepository;
@@ -34,6 +40,7 @@ export class HedgingEngine {
   private slManager: StopLossManager;
   private hlClient: HyperliquidClient;
   private callbacks: HedgeEventCallbacks;
+  private rangeTradingBridge?: RangeTradingBridge;
 
   constructor(
     poolsRepo: PoolsRepository,
@@ -52,6 +59,11 @@ export class HedgingEngine {
     this.slManager = new StopLossManager(hlClient, slRepo);
     this.hlClient = hlClient;
     this.callbacks = callbacks ?? {};
+  }
+
+  /** Set the range trading bridge for mutual exclusion */
+  setRangeTradingBridge(bridge: RangeTradingBridge): void {
+    this.rangeTradingBridge = bridge;
   }
 
   /** Handle range exit: open hedges */
@@ -80,6 +92,16 @@ export class HedgingEngine {
         'Protection wallet has no private key loaded — skipping hedge. Run "pnpm setup-keys" to configure.',
       );
       return;
+    }
+
+    // Force-close any open range trade before opening hedge (mutual exclusion)
+    if (this.rangeTradingBridge?.hasOpenTrade(config.id)) {
+      logger.info({ poolConfigId: config.id }, 'Closing range trade before opening hedge');
+      try {
+        await this.rangeTradingBridge.forceClose(config.id, parseFloat(event.currentPrice));
+      } catch (error) {
+        logger.error({ poolConfigId: config.id, error }, 'Failed to force-close range trade');
+      }
     }
 
     const currentPrice = parseFloat(event.currentPrice);

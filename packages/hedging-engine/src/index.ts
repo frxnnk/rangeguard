@@ -1,7 +1,11 @@
 export { HedgingEngine } from './engine.js';
 export { HyperliquidClient } from './hyperliquid-client.js';
+export { DryRunClient } from './dry-run-client.js';
 export { HedgeCalculator } from './hedge-calculator.js';
 export { OrderExecutor } from './order-executor.js';
 export { PositionTracker } from './position-tracker.js';
 export { StopLossManager } from './stop-loss-manager.js';
 export { WalletMonitor } from './wallet-monitor.js';
+export { RangeTradingEngine } from './range-trading-engine.js';
+export { EntryZoneDetector } from './entry-zone-detector.js';
+export { TrailingStopManager } from './trailing-stop-manager.js';

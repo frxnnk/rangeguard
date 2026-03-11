@@ -25,6 +25,14 @@ interface PoolConfigRow {
   current_price: string | null;
   created_at: number;
   updated_at: number;
+  // Range trading (R10)
+  trading_enabled: number;
+  trading_leverage: number;
+  trading_stop_loss_percent: number;
+  trading_trailing_percent: number;
+  trading_entry_zone_percent: number;
+  trading_cooldown_seconds: number;
+  trading_max_size_usd: number;
 }
 
 function rowToPoolConfig(row: PoolConfigRow): PoolConfig {
@@ -51,6 +59,13 @@ function rowToPoolConfig(row: PoolConfigRow): PoolConfig {
     currentPrice: row.current_price ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    tradingEnabled: row.trading_enabled === 1,
+    tradingLeverage: row.trading_leverage,
+    tradingStopLossPercent: row.trading_stop_loss_percent,
+    tradingTrailingPercent: row.trading_trailing_percent,
+    tradingEntryZonePercent: row.trading_entry_zone_percent,
+    tradingCooldownSeconds: row.trading_cooldown_seconds,
+    tradingMaxSizeUsd: row.trading_max_size_usd,
   };
 }
 
@@ -205,6 +220,34 @@ export class PoolsRepository {
       fields.push('protection_active = @protectionActive');
       values.protectionActive = data.protectionActive ? 1 : 0;
     }
+    if (data.tradingEnabled !== undefined) {
+      fields.push('trading_enabled = @tradingEnabled');
+      values.tradingEnabled = data.tradingEnabled ? 1 : 0;
+    }
+    if (data.tradingLeverage !== undefined) {
+      fields.push('trading_leverage = @tradingLeverage');
+      values.tradingLeverage = data.tradingLeverage;
+    }
+    if (data.tradingStopLossPercent !== undefined) {
+      fields.push('trading_stop_loss_percent = @tradingStopLossPercent');
+      values.tradingStopLossPercent = data.tradingStopLossPercent;
+    }
+    if (data.tradingTrailingPercent !== undefined) {
+      fields.push('trading_trailing_percent = @tradingTrailingPercent');
+      values.tradingTrailingPercent = data.tradingTrailingPercent;
+    }
+    if (data.tradingEntryZonePercent !== undefined) {
+      fields.push('trading_entry_zone_percent = @tradingEntryZonePercent');
+      values.tradingEntryZonePercent = data.tradingEntryZonePercent;
+    }
+    if (data.tradingCooldownSeconds !== undefined) {
+      fields.push('trading_cooldown_seconds = @tradingCooldownSeconds');
+      values.tradingCooldownSeconds = data.tradingCooldownSeconds;
+    }
+    if (data.tradingMaxSizeUsd !== undefined) {
+      fields.push('trading_max_size_usd = @tradingMaxSizeUsd');
+      values.tradingMaxSizeUsd = data.tradingMaxSizeUsd;
+    }
 
     if (fields.length === 0) {
       return existing;
@@ -255,6 +298,8 @@ export class PoolsRepository {
         )
         .run(id);
       this.db.prepare('DELETE FROM hedge_trades WHERE pool_config_id = ?').run(id);
+      this.db.prepare('DELETE FROM range_trades WHERE pool_config_id = ?').run(id);
+      this.db.prepare('DELETE FROM stop_loss_orders WHERE pool_config_id = ?').run(id);
       this.db.prepare('DELETE FROM pool_configs WHERE id = ?').run(id);
     });
     deleteAll();

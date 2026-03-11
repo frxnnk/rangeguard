@@ -26,18 +26,18 @@ export default function PoolsPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pools'] });
-      toast.success('Protection toggled');
+      toast.success('Protección actualizada');
     },
-    onError: () => toast.error('Failed to toggle protection'),
+    onError: () => toast.error('Error al cambiar protección'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => fetch(`/api/pools/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pools'] });
-      toast.success('Pool deleted');
+      toast.success('Pool eliminado');
     },
-    onError: () => toast.error('Failed to delete pool'),
+    onError: () => toast.error('Error al eliminar pool'),
   });
 
   return (
@@ -45,7 +45,7 @@ export default function PoolsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Pools</h1>
         <Button asChild>
-          <Link href="/pools/new">+ Add Pool</Link>
+          <Link href="/pools/new">+ Agregar Pool</Link>
         </Button>
       </div>
 
@@ -59,9 +59,9 @@ export default function PoolsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Layers className="size-10 text-muted-foreground mb-3" aria-hidden="true" />
-            <p className="text-muted-foreground mb-4">No pools configured yet.</p>
+            <p className="text-muted-foreground mb-4">No hay pools configurados.</p>
             <Button asChild>
-              <Link href="/pools/new">Add your first pool</Link>
+              <Link href="/pools/new">Agregar tu primer pool</Link>
             </Button>
           </CardContent>
         </Card>

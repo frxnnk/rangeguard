@@ -4,7 +4,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-22+-green)
 ![License](https://img.shields.io/badge/License-Proprietary-red)
-![Tests](https://img.shields.io/badge/Tests-62%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-78%20passing-brightgreen)
 
 Bot de cobertura automatizada contra **Impermanent Loss** en pools de liquidez concentrada (Uniswap V3). Cuando el precio sale del rango configurado, el bot abre posiciones de hedge en **Hyperliquid DEX** (perpetuos) para compensar la perdida. Cuando vuelve al rango, cierra las posiciones automaticamente.
 
@@ -49,6 +49,7 @@ Para una guia E2E paso a paso en testnet, ver [docs/TESTNET_GUIDE.md](docs/TESTN
 - [Testing](#testing)
 - [Calidad de codigo](#calidad-de-codigo)
 - [Docker](#docker)
+- [Deploy en Railway (cloud)](#deploy-en-railway-cloud)
 - [CI/CD](#cicd)
 - [shadcn/ui](#shadcnui)
 - [Troubleshooting](#troubleshooting)
@@ -59,18 +60,43 @@ Para una guia E2E paso a paso en testnet, ver [docs/TESTNET_GUIDE.md](docs/TESTN
 
 ## Prerequisitos
 
-| Herramienta | Version minima | Verificar con   |
-| ----------- | -------------- | --------------- |
-| Node.js     | 20.0.0         | `node -v`       |
-| pnpm        | 9.0.0          | `pnpm -v`       |
-| Git         | cualquiera     | `git --version` |
+| Herramienta      | Version minima | Verificar con   |
+| ---------------- | -------------- | --------------- |
+| Node.js          | 20.0.0         | `node -v`       |
+| pnpm             | 9.0.0          | `pnpm -v`       |
+| Git              | cualquiera     | `git --version` |
+| C++ build tools  | -              | ver abajo       |
 
-> **Recomendado**: Node.js 22+ (usa `import.meta.dirname` nativo en el bot).
+> **Recomendado**: Node.js 22+ (usa `import.meta.dirname` nativo en el bot). El repo incluye `.nvmrc` — si usas nvm, `nvm use` selecciona la version correcta.
 
 Si no tenes pnpm:
 
 ```bash
 npm install -g pnpm
+```
+
+### Build tools nativos (para better-sqlite3)
+
+`better-sqlite3` requiere compilacion nativa. Si `pnpm install` falla con errores de `node-gyp`:
+
+**Windows:**
+```bash
+# Opcion 1: instalar desde terminal con permisos admin
+npm install -g windows-build-tools
+
+# Opcion 2: instalar Visual Studio Build Tools manualmente
+# https://visualstudio.microsoft.com/visual-cpp-build-tools/
+# Seleccionar "Desktop development with C++"
+```
+
+**macOS:**
+```bash
+xcode-select --install
+```
+
+**Linux (Debian/Ubuntu):**
+```bash
+sudo apt-get install python3 make g++
 ```
 
 ---
@@ -564,12 +590,13 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 | `pnpm build`           | Build de produccion de todos los packages                          |
 | `pnpm build:dashboard` | Build de produccion solo del dashboard                             |
 | `pnpm typecheck`       | Typecheck de todos los packages (tsc --noEmit)                     |
-| `pnpm test`            | Correr todos los tests (62 tests via Vitest)                       |
+| `pnpm test`            | Correr todos los tests (78 tests via Vitest)                       |
 | `pnpm lint`            | ESLint en todo el proyecto                                         |
 | `pnpm lint:fix`        | ESLint con auto-fix                                                |
 | `pnpm format`          | Prettier en todo el proyecto                                       |
 | `pnpm format:check`    | Verificar formato sin modificar                                    |
 | `pnpm testnet-seed`    | Crear DB con datos de prueba (dummy addresses, bueno para Nivel 1) |
+| `pnpm demo-seed`       | Seedear DB con data realista para demos (wallets, pools, hedges, precios) |
 | `pnpm setup-testnet`   | Genera wallets reales, las guarda en vault y seedea la DB          |
 | `pnpm setup-keys`      | CLI interactivo para gestionar private keys en el vault            |
 | `pnpm db:migrate`      | Correr migraciones de la DB                                        |
@@ -580,13 +607,13 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 
 ### Unit Tests
 
-62 tests via Vitest organizados por package:
+78 tests via Vitest organizados por package:
 
-| Package        | Tests | Cobertura                                            |
-| -------------- | ----- | ---------------------------------------------------- |
-| db             | 34    | pools.repo (12), wallets.repo (11), hedges.repo (11) |
-| pool-monitor   | 15    | range-detector state machine (15 edge cases)         |
-| hedging-engine | 13    | hedge-calculator validations                         |
+| Package        | Tests | Cobertura                                                              |
+| -------------- | ----- | ---------------------------------------------------------------------- |
+| db             | 50    | pools.repo (12), wallets.repo (11), hedges.repo (12), pnl (4), sl (11) |
+| pool-monitor   | 15    | range-detector state machine (15 edge cases)                           |
+| hedging-engine | 13    | hedge-calculator validations                                           |
 
 ```bash
 pnpm test            # Correr todos los tests
@@ -634,17 +661,38 @@ pnpm format:check    # Prettier check
 
 ## Docker
 
-Multi-stage Dockerfile con targets separados para bot y dashboard:
+Multi-stage Dockerfile con targets separados para bot y dashboard.
+
+### Docker Compose (desarrollo local)
 
 ```bash
-# Build y correr con docker-compose
+cp .env.example .env
+# Editar .env con al menos RPC_ARBITRUM
+
 docker compose up -d
 
-# O individualmente
+# Ver logs
+docker compose logs -f bot
+docker compose logs -f dashboard
+
+# Dashboard en http://localhost:3000
+```
+
+Los dos containers comparten un volumen `bot-data` para la DB SQLite. El vault se monta por separado.
+
+Para parar:
+
+```bash
+docker compose down           # Para containers (preserva data)
+docker compose down -v        # Para containers + elimina volumenes (reset total)
+```
+
+### Build individual
+
+```bash
 docker build --target bot -t trading-bot .
 docker build --target dashboard -t trading-dashboard .
 
-# Correr el bot con variables de entorno
 docker run -d --name bot \
   -v trading-data:/app/data \
   -e VAULT_PASSWORD=tu-password \
@@ -652,7 +700,30 @@ docker run -d --name bot \
   trading-bot
 ```
 
-Los dos containers comparten un volumen `bot-data` para la DB SQLite. El vault se monta por separado.
+---
+
+## Deploy en Railway (cloud)
+
+Para tener tu propia instancia en la nube:
+
+1. Crear cuenta en [Railway](https://railway.com) (free tier disponible)
+2. Instalar CLI: `npm install -g @railway/cli`
+3. Desde el repo:
+
+```bash
+railway login
+railway init -n mi-trading-bot
+railway up
+railway domain
+```
+
+4. Setear variables de entorno en Railway dashboard:
+   - `RPC_ARBITRUM` (requerido para precios)
+   - `VAULT_PASSWORD` (requerido para trading)
+   - `WALLET_KEYS=pool-eth-arb:protection:0xKEY,...` (importa private keys al vault)
+   - `DEMO_SEED=true` (opcional, seedea data de ejemplo)
+
+Ver guia completa: [docs/RAILWAY_DEPLOY.md](docs/RAILWAY_DEPLOY.md)
 
 ---
 
@@ -775,7 +846,7 @@ pnpm install
 | Graficos         | Recharts                             |
 | Logging          | pino + pino-pretty                   |
 | Seguridad        | AES-256-GCM + scrypt KDF             |
-| Testing          | Vitest (62 tests)                    |
+| Testing          | Vitest (78 tests)                    |
 | Linting          | ESLint + Prettier                    |
 | CI/CD            | GitHub Actions                       |
 | Containerizacion | Docker multi-stage                   |

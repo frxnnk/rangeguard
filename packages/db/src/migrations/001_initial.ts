@@ -119,5 +119,57 @@ export function runMigrations(db: Database.Database): void {
       cancelled_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_sl_orders_pool ON stop_loss_orders(pool_config_id, status);
+
+    -- Range trading config columns on pool_configs (R10)
+    -- Using INSERT OR IGNORE pattern for idempotent column additions
+  `);
+
+  // Add range trading columns to pool_configs (ALTERs are idempotent via try/catch)
+  const tradingColumns = [
+    `ALTER TABLE pool_configs ADD COLUMN trading_enabled INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_leverage INTEGER NOT NULL DEFAULT 5`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_stop_loss_percent REAL NOT NULL DEFAULT 2.0`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_trailing_percent REAL NOT NULL DEFAULT 1.5`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_entry_zone_percent REAL NOT NULL DEFAULT 25.0`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_cooldown_seconds INTEGER NOT NULL DEFAULT 300`,
+    `ALTER TABLE pool_configs ADD COLUMN trading_max_size_usd REAL NOT NULL DEFAULT 1000.0`,
+  ];
+
+  for (const sql of tradingColumns) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+
+  // Range trades table (R10)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS range_trades (
+      id TEXT PRIMARY KEY,
+      pool_config_id TEXT NOT NULL REFERENCES pool_configs(id),
+      wallet_id TEXT NOT NULL REFERENCES wallets(id),
+      asset TEXT NOT NULL,
+      side TEXT NOT NULL CHECK(side IN ('short', 'long')),
+      size TEXT NOT NULL,
+      entry_price TEXT NOT NULL,
+      leverage INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed', 'stopped', 'liquidated')),
+      exit_price TEXT,
+      realized_pnl TEXT,
+      fees TEXT NOT NULL DEFAULT '0',
+      stop_loss_price TEXT NOT NULL,
+      trailing_percent REAL NOT NULL,
+      peak_price TEXT,
+      current_stop_price TEXT,
+      hl_order_id TEXT,
+      opened_at INTEGER NOT NULL,
+      closed_at INTEGER,
+      close_reason TEXT CHECK(close_reason IN ('trailing_stop', 'stop_loss', 'hedge_priority', 'manual', 'liquidated') OR close_reason IS NULL)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_range_trades_pool ON range_trades(pool_config_id);
+    CREATE INDEX IF NOT EXISTS idx_range_trades_status ON range_trades(status);
+    CREATE INDEX IF NOT EXISTS idx_range_trades_wallet ON range_trades(wallet_id);
   `);
 }

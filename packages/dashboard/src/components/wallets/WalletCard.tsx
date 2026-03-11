@@ -51,20 +51,20 @@ export function WalletCard({ wallet }: WalletCardProps) {
         {isLow && (
           <Alert className="border-yellow-500/30 text-yellow-400 mb-3">
             <AlertDescription className="text-xs">
-              Low balance! Below ${threshold} threshold
+              ¡Saldo bajo! Por debajo del umbral de ${threshold}
             </AlertDescription>
           </Alert>
         )}
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">Available</p>
+            <p className="text-xs text-muted-foreground">Disponible</p>
             <p className={`text-sm font-medium ${isLow ? 'text-yellow-400' : 'text-foreground'}`}>
               {available !== null ? `$${available.toFixed(2)}` : '--'}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Margin Used</p>
+            <p className="text-xs text-muted-foreground">Margen Usado</p>
             <p className="text-sm font-medium text-foreground">
               {marginUsed !== null ? `$${marginUsed.toFixed(2)}` : '--'}
             </p>
@@ -79,7 +79,7 @@ export function WalletCard({ wallet }: WalletCardProps) {
 
         {wallet.lastBalanceCheck && (
           <p className="text-xs text-muted-foreground mt-3">
-            Updated {new Date(wallet.lastBalanceCheck).toLocaleTimeString()}
+            Actualizado {new Date(wallet.lastBalanceCheck).toLocaleTimeString('es-AR')}
           </p>
         )}
       </CardContent>

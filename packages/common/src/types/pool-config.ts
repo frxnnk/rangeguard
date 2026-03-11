@@ -30,6 +30,15 @@ export interface PoolConfig {
   currentPrice?: string;
   createdAt: number;
   updatedAt: number;
+
+  // Range trading config (R10)
+  tradingEnabled: boolean;
+  tradingLeverage: number;
+  tradingStopLossPercent: number; // e.g. 2.0 = 2%
+  tradingTrailingPercent: number; // e.g. 1.5 = 1.5%
+  tradingEntryZonePercent: number; // e.g. 25 = 25% of range
+  tradingCooldownSeconds: number; // seconds between trades
+  tradingMaxSizeUsd: number; // max position size in USD
 }
 
 export interface CreatePoolConfig {
@@ -50,4 +59,13 @@ export interface CreatePoolConfig {
   protectionWalletId: string;
   profitWalletEnabled: boolean;
   protectionActive: boolean;
+
+  // Range trading config (R10) — all optional, defaults applied in DB
+  tradingEnabled?: boolean;
+  tradingLeverage?: number;
+  tradingStopLossPercent?: number;
+  tradingTrailingPercent?: number;
+  tradingEntryZonePercent?: number;
+  tradingCooldownSeconds?: number;
+  tradingMaxSizeUsd?: number;
 }

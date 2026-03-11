@@ -1,7 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -13,9 +14,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Clock, TrendingUp, TrendingDown, Activity, Zap } from 'lucide-react';
+import { Clock, TrendingUp, TrendingDown, Activity, Zap, Trash2 } from 'lucide-react';
 
 interface Trade {
   id: string;
@@ -39,12 +41,12 @@ function formatPnl(value: number): string {
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function formatDuration(openedAt: number, closedAt: number): string {
@@ -59,10 +61,21 @@ function formatDuration(openedAt: number, closedAt: number): string {
 
 export default function HistoryPage() {
   const [showFalseBreakoutsOnly, setShowFalseBreakoutsOnly] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['trades'],
     queryFn: () => fetch('/api/trades?limit=100').then((r) => r.json()),
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: () => fetch('/api/trades', { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trades'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      toast.success('Historial eliminado');
+    },
+    onError: () => toast.error('Error al eliminar historial'),
   });
 
   const trades: Trade[] = data?.trades || [];
@@ -90,10 +103,26 @@ export default function HistoryPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Trade History</h1>
+        <h1 className="text-2xl font-bold text-foreground">Historial de Trades</h1>
         <div className="flex items-center gap-4">
+          {trades.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-destructive"
+              onClick={() => {
+                if (confirm('¿Eliminar todo el historial de trades? Esta acción no se puede deshacer.')) {
+                  deleteAllMutation.mutate();
+                }
+              }}
+              disabled={deleteAllMutation.isPending}
+            >
+              <Trash2 className="size-3.5 mr-1" />
+              {deleteAllMutation.isPending ? 'Eliminando...' : 'Borrar todo'}
+            </Button>
+          )}
           <span className="text-sm text-muted-foreground">
-            False breakouts:{' '}
+            Falsas rupturas:{' '}
             <span className="text-orange-400 font-medium tabular-nums">{falseBreakoutCount}</span>
           </span>
           <div className="flex items-center gap-2">
@@ -106,7 +135,7 @@ export default function HistoryPage() {
               htmlFor="false-breakouts"
               className="text-sm text-muted-foreground cursor-pointer"
             >
-              False breakouts only
+              Solo falsas rupturas
             </Label>
           </div>
         </div>
@@ -129,9 +158,9 @@ export default function HistoryPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Clock className="size-10 text-muted-foreground/40 mb-3" aria-hidden="true" />
-            <p className="text-muted-foreground text-sm">No trade history yet.</p>
+            <p className="text-muted-foreground text-sm">No hay historial de trades.</p>
             <p className="text-muted-foreground/60 text-xs mt-1">
-              Closed hedges will appear here with P&L details.
+              Las coberturas cerradas aparecerán aquí con detalles de PnL.
             </p>
           </CardContent>
         </Card>
@@ -147,20 +176,20 @@ export default function HistoryPage() {
                 accent="text-muted-foreground"
               />
               <StatCard
-                label="Win Rate"
+                label="Tasa de Acierto"
                 value={`${stats.winRate}%`}
-                sub={`${stats.wins}W / ${stats.losses}L`}
+                sub={`${stats.wins}G / ${stats.losses}P`}
                 icon={Zap}
                 accent={stats.winRate >= 50 ? 'text-green-400' : 'text-red-400'}
               />
               <StatCard
-                label="Total P&L"
+                label="PnL Total"
                 value={formatPnl(stats.totalPnl)}
                 icon={stats.totalPnl >= 0 ? TrendingUp : TrendingDown}
                 accent={stats.totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}
               />
               <StatCard
-                label="Avg Trade"
+                label="Promedio"
                 value={
                   stats.wins + stats.losses > 0
                     ? formatPnl(stats.totalPnl / (stats.wins + stats.losses))
@@ -176,7 +205,7 @@ export default function HistoryPage() {
           {filtered.length === 0 && showFalseBreakoutsOnly ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <p className="text-muted-foreground text-sm">No false breakouts recorded.</p>
+                <p className="text-muted-foreground text-sm">No hay falsas rupturas registradas.</p>
               </CardContent>
             </Card>
           ) : (
@@ -185,16 +214,16 @@ export default function HistoryPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[100px]">Date</TableHead>
-                      <TableHead>Asset</TableHead>
-                      <TableHead>Side</TableHead>
-                      <TableHead className="text-right">Size</TableHead>
-                      <TableHead className="text-right">Entry</TableHead>
-                      <TableHead className="text-right">Exit</TableHead>
-                      <TableHead className="text-right">P&L</TableHead>
-                      <TableHead className="text-center">Duration</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Reason</TableHead>
+                      <TableHead className="w-[100px]">Fecha</TableHead>
+                      <TableHead>Activo</TableHead>
+                      <TableHead>Lado</TableHead>
+                      <TableHead className="text-right">Tamaño</TableHead>
+                      <TableHead className="text-right">Entrada</TableHead>
+                      <TableHead className="text-right">Salida</TableHead>
+                      <TableHead className="text-right">PnL</TableHead>
+                      <TableHead className="text-center">Duración</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Motivo</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -309,12 +338,12 @@ export default function HistoryPage() {
                                 variant="outline"
                                 className="text-[10px] bg-orange-500/10 text-orange-400 border-orange-500/20"
                               >
-                                False Breakout
+                                Falsa Ruptura
                               </Badge>
                             ) : trade.closeReason ? (
                               <span className="text-[11px] text-muted-foreground">
                                 {trade.closeReason === 'range_return'
-                                  ? 'Range return'
+                                  ? 'Retorno al rango'
                                   : trade.closeReason === 'manual'
                                     ? 'Manual'
                                     : trade.closeReason}
@@ -332,7 +361,7 @@ export default function HistoryPage() {
               <div className="border-t border-border px-4 py-3 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground/60">
                   {filtered.length} trade{filtered.length !== 1 ? 's' : ''}
-                  {showFalseBreakoutsOnly ? ' (filtered)' : ''}
+                  {showFalseBreakoutsOnly ? ' (filtrado)' : ''}
                 </span>
                 {stats && filtered.length > 0 && !showFalseBreakoutsOnly && (
                   <span
@@ -340,7 +369,7 @@ export default function HistoryPage() {
                       stats.totalPnl >= 0 ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
-                    Net: {formatPnl(stats.totalPnl)}
+                    Neto: {formatPnl(stats.totalPnl)}
                   </span>
                 )}
               </div>

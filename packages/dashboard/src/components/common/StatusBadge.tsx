@@ -17,14 +17,14 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  'in-range': 'In Range',
-  'out-of-range-below': 'Below Range',
-  'out-of-range-above': 'Above Range',
-  monitoring: 'Monitoring',
+  'in-range': 'En Rango',
+  'out-of-range-below': 'Debajo del Rango',
+  'out-of-range-above': 'Arriba del Rango',
+  monitoring: 'Monitoreando',
   error: 'Error',
-  open: 'Open',
-  closed: 'Closed',
-  liquidated: 'Liquidated',
+  open: 'Abierto',
+  closed: 'Cerrado',
+  liquidated: 'Liquidado',
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {

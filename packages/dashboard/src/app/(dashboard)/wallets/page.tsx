@@ -11,8 +11,8 @@ export default function WalletsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Wallets</h1>
-        {!showForm && <Button onClick={() => setShowForm(true)}>+ Add Wallet</Button>}
+        <h1 className="text-2xl font-bold text-foreground">Billeteras</h1>
+        {!showForm && <Button onClick={() => setShowForm(true)}>+ Agregar Billetera</Button>}
       </div>
 
       {showForm && (

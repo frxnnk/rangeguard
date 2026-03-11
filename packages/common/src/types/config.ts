@@ -22,6 +22,7 @@ export interface AppConfig {
   };
   alertWebhookUrl?: string;
   logLevel: string;
+  dryRun: boolean;
 }
 
 export const DEFAULT_CONFIG: Partial<AppConfig> = {

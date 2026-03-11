@@ -13,7 +13,7 @@ pnpm dev:bot                # Start bot (tsx, no watch)
 pnpm dev:dashboard          # Start Next.js dashboard on :3000
 
 # Quality checks (run all before committing)
-pnpm test                   # 62 tests via Vitest
+pnpm test                   # 116 tests via Vitest
 pnpm typecheck              # tsc --noEmit across 7 packages
 pnpm lint                   # ESLint (0 errors, ~28 warnings expected)
 pnpm format:check           # Prettier check
@@ -36,7 +36,7 @@ packages/common          → Types, constants (chains/pairs/ABIs), utils (logger
 packages/db              → SQLite (better-sqlite3, WAL), 6 tables, repository pattern
 packages/security        → AES-256-GCM vault for N wallet private keys, scrypt KDF
 packages/pool-monitor    → viem multi-chain clients, Swap event WS + slot0 polling, range detector
-packages/hedging-engine  → @nktkas/hyperliquid SDK, hedge calculator, order executor, wallet monitor
+packages/hedging-engine  → @nktkas/hyperliquid SDK, hedge calculator, order executor, wallet monitor, range trading engine
 packages/dashboard       → Next.js 15 App Router, TanStack Query, Recharts, shadcn/ui (dark theme)
 apps/bot                 → Bootstrap, event bus, config loader, graceful shutdown
 ```
@@ -77,7 +77,7 @@ apps/bot                 → Bootstrap, event bus, config loader, graceful shutd
 
 ## Database
 
-SQLite WAL at `data/bot.db`. Tables: `wallets`, `pool_configs`, `hedge_trades`, `trade_log`, `pnl_snapshots`, `price_cache`.
+SQLite WAL at `data/bot.db`. Tables: `wallets`, `pool_configs`, `hedge_trades`, `range_trades`, `trade_log`, `pnl_snapshots`, `price_cache`.
 
 Private keys are NEVER stored in the DB — only in the encrypted vault file.
 
@@ -87,7 +87,7 @@ shadcn/ui (new-york style, dark theme), 17 components installed. Config at `pack
 
 ### API Routes
 
-`/api/pools`, `/api/wallets`, `/api/hedges`, `/api/hedges/[id]/close`, `/api/trades`, `/api/stats`, `/api/prices`, `/api/pnl`, `/api/bot-status`
+`/api/pools`, `/api/wallets`, `/api/hedges`, `/api/hedges/[id]/close`, `/api/trades`, `/api/range-trades`, `/api/stats`, `/api/prices`, `/api/pnl`, `/api/bot-status`
 
 ### Adding shadcn/ui components
 
@@ -101,7 +101,7 @@ npx shadcn@latest add <component-name>
 Vitest workspace config at root. Per-package `vitest.config.ts`.
 
 - Test DB: in-memory SQLite via `createTestDb()` in `packages/db/src/test-utils.ts`
-- 62 tests: db (34), pool-monitor (15), hedging-engine (13)
+- 116 tests: db (64), pool-monitor (15), hedging-engine (37)
 
 ## Security
 
@@ -113,8 +113,9 @@ Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
 
 ## Current Status
 
-- All code complete, 62 tests passing, 0 typecheck errors
-- Dashboard fully migrated to shadcn/ui with semantic tokens
+- V1 complete + V2 features (R10 range trading, R11 per-pool costs, R12 Spanish UI)
+- 116 tests passing, 0 typecheck errors
+- Dashboard fully migrated to shadcn/ui with semantic tokens, all in Spanish
 - Docker + CI/CD configured
 - **E2E tested on HL testnet** (2026-03-10): full open→close hedge cycle verified
   - Hedge open: short 0.0097 ETH @ $2062.9 (IOC filled, 2.4s latency)

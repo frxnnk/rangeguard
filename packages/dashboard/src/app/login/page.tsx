@@ -30,10 +30,10 @@ export default function LoginPage() {
         router.push('/');
         router.refresh();
       } else {
-        setError('Invalid API key');
+        setError('API key inválida');
       }
     } catch {
-      setError('Connection error');
+      setError('Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-6">
             <Shield className="size-8 text-muted-foreground mb-2" />
             <h1 className="text-lg font-bold text-foreground">Trading Bot</h1>
-            <p className="text-xs text-muted-foreground">Enter API key to continue</p>
+            <p className="text-xs text-muted-foreground">Ingresá la API key para continuar</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,7 +57,7 @@ export default function LoginPage() {
                 type="password"
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                placeholder="Enter your API key"
+                placeholder="Ingresá tu API key"
                 autoFocus
                 required
               />
@@ -66,7 +66,7 @@ export default function LoginPage() {
             {error && <p className="text-xs text-destructive">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Verifying\u2026' : 'Login'}
+              {loading ? 'Verificando\u2026' : 'Iniciar sesión'}
             </Button>
           </form>
         </CardContent>

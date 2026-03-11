@@ -29,7 +29,6 @@ RUN mkdir -p /app/data && chown botuser:botuser /app/data
 RUN mkdir -p /home/botuser/.trading-bot-cgr && chown botuser:botuser /home/botuser/.trading-bot-cgr
 ENV NODE_ENV=production
 USER botuser
-VOLUME ["/app/data", "/home/botuser/.trading-bot-cgr"]
 CMD ["node", "--no-warnings", "--import", "tsx", "apps/bot/src/main.ts"]
 
 # ---- dashboard (target) ----
@@ -45,3 +44,14 @@ ENV NODE_ENV=production
 USER botuser
 EXPOSE 3000
 CMD ["pnpm", "--filter", "@trading-bot/dashboard", "start"]
+
+# ---- combined (single service for Railway — no VOLUME, Railway manages volumes) ----
+FROM deps AS combined
+COPY . .
+COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
+RUN mkdir -p /app/data && chown botuser:botuser /app/data
+RUN mkdir -p /home/botuser/.trading-bot-cgr && chown botuser:botuser /home/botuser/.trading-bot-cgr
+ENV NODE_ENV=production
+USER botuser
+EXPOSE 3000
+CMD ["bash", "scripts/start-railway.sh"]

@@ -29,7 +29,7 @@ export default function HedgesPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['hedges'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
-      toast.success(`Hedge closed. P&L: $${data.realizedPnl}`);
+      toast.success(`Cobertura cerrada. PnL: $${data.realizedPnl}`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -38,7 +38,7 @@ export default function HedgesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-foreground mb-6">Active Hedges</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Coberturas Activas</h1>
 
       {isLoading ? (
         <div className="grid gap-4">
@@ -50,9 +50,9 @@ export default function HedgesPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <ShieldCheck className="size-10 text-muted-foreground mb-3" aria-hidden="true" />
-            <p className="text-muted-foreground text-sm">No active hedges.</p>
+            <p className="text-muted-foreground text-sm">No hay coberturas activas.</p>
             <p className="text-muted-foreground text-xs mt-1">
-              Hedges open automatically when price exits a pool's range.
+              Las coberturas se abren automáticamente cuando el precio sale del rango.
             </p>
           </CardContent>
         </Card>
@@ -66,13 +66,13 @@ export default function HedgesPage() {
                   variant="link"
                   className="h-auto p-0 text-xs text-destructive"
                   onClick={() => {
-                    if (confirm('Close this hedge manually? This will record the close in DB.')) {
+                    if (confirm('¿Cerrar esta cobertura manualmente? Se registrará el cierre en la base de datos.')) {
                       closeMutation.mutate(hedge.id);
                     }
                   }}
                   disabled={closeMutation.isPending}
                 >
-                  {closeMutation.isPending ? 'Closing\u2026' : 'Close Manually'}
+                  {closeMutation.isPending ? 'Cerrando\u2026' : 'Cerrar Manualmente'}
                 </Button>
               </div>
             </div>

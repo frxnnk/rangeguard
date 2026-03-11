@@ -388,4 +388,108 @@ describe('HedgesRepository', () => {
       expect(repo.sumRealizedPnl()).toBeCloseTo(75.2, 2);
     });
   });
+
+  describe('statsByPool', () => {
+    it('should return aggregate stats for a pool', () => {
+      const h1 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '1.0',
+        entryPrice: '2000',
+        leverage: 10,
+        fees: '0.50',
+      });
+      const h2 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '2.0',
+        entryPrice: '2100',
+        leverage: 10,
+        fees: '0.70',
+      });
+
+      repo.close(h1.id, '1900', '100.00', 'range_return', false, '0.50');
+      repo.close(h2.id, '2200', '-30.00', 'manual', false, '0.70');
+
+      const stats = repo.statsByPool(poolId);
+      expect(stats.totalTrades).toBe(2);
+      expect(stats.totalPnl).toBeCloseTo(70, 2);
+      expect(stats.totalFees).toBeCloseTo(2.4, 2);
+      expect(stats.wins).toBe(1);
+      expect(stats.losses).toBe(1);
+    });
+  });
+
+  describe('deleteHistoryByPool', () => {
+    it('should delete closed trades for a specific pool', () => {
+      const h1 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '1.0',
+        entryPrice: '2000',
+        leverage: 10,
+      });
+      // Leave one open
+      repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '2.0',
+        entryPrice: '2100',
+        leverage: 10,
+      });
+
+      repo.close(h1.id, '1900', '50', 'range_return', false);
+
+      const deleted = repo.deleteHistoryByPool(poolId);
+      expect(deleted).toBe(1);
+
+      // Open hedge should remain
+      const open = repo.findOpenByPool(poolId);
+      expect(open).toHaveLength(1);
+    });
+  });
+
+  describe('deleteAllHistory', () => {
+    it('should delete all closed trades', () => {
+      const h1 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '1.0',
+        entryPrice: '2000',
+        leverage: 10,
+      });
+      const h2 = repo.create({
+        poolConfigId: poolId,
+        walletId,
+        walletType: 'protection',
+        asset: 'ETH',
+        side: 'short',
+        size: '2.0',
+        entryPrice: '2100',
+        leverage: 10,
+      });
+
+      repo.close(h1.id, '1900', '50', 'range_return', false);
+      repo.close(h2.id, '2200', '-10', 'manual', false);
+
+      const deleted = repo.deleteAllHistory();
+      expect(deleted).toBe(2);
+      expect(repo.findHistory(100, 0)).toHaveLength(0);
+    });
+  });
 });

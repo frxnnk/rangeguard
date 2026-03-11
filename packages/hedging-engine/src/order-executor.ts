@@ -59,7 +59,10 @@ export class OrderExecutor {
       params.currentPrice,
       params.leverage,
     );
-    protectionOrder.estimatedFees = estimateFee(protectionOrder.filledSize, protectionOrder.avgPrice);
+    protectionOrder.estimatedFees = estimateFee(
+      protectionOrder.filledSize,
+      protectionOrder.avgPrice,
+    );
 
     this.logTrade(config.protectionWalletId, 'open_hedge_protection', protectionOrder);
 
@@ -105,7 +108,10 @@ export class OrderExecutor {
       asset,
       currentPrice,
     );
-    protectionOrder.estimatedFees = estimateFee(protectionOrder.filledSize, protectionOrder.avgPrice);
+    protectionOrder.estimatedFees = estimateFee(
+      protectionOrder.filledSize,
+      protectionOrder.avgPrice,
+    );
 
     this.logTrade(config.protectionWalletId, 'close_hedge_protection', protectionOrder);
 
@@ -120,6 +126,62 @@ export class OrderExecutor {
     }
 
     return { protectionOrder, profitOrder };
+  }
+
+  /** Open a range trade on the protection wallet */
+  async openRangeTrade(
+    config: PoolConfig,
+    side: 'short' | 'long',
+    size: string,
+    currentPrice: number,
+  ): Promise<OrderResult> {
+    const isBuy = side === 'long';
+
+    logger.info(
+      {
+        configId: config.id,
+        wallet: config.protectionWalletId,
+        type: 'range_trade',
+        asset: config.hedgeAsset,
+        side,
+        size,
+      },
+      'Opening range trade',
+    );
+
+    const result = await this.hlClient.placeMarketOrder(
+      config.protectionWalletId,
+      config.hedgeAsset,
+      isBuy,
+      size,
+      currentPrice,
+      config.tradingLeverage,
+    );
+    result.estimatedFees = estimateFee(result.filledSize, result.avgPrice);
+
+    this.logTrade(config.protectionWalletId, 'open_range_trade', result);
+    return result;
+  }
+
+  /** Close a range trade position */
+  async closeRangeTrade(
+    config: PoolConfig,
+    asset: string,
+    side: 'short' | 'long',
+    size: string,
+    currentPrice: number,
+  ): Promise<OrderResult> {
+    logger.info({ configId: config.id, asset, side }, 'Closing range trade');
+
+    const result = await this.hlClient.closePosition(
+      config.protectionWalletId,
+      asset,
+      currentPrice,
+    );
+    result.estimatedFees = estimateFee(result.filledSize, result.avgPrice);
+
+    this.logTrade(config.protectionWalletId, 'close_range_trade', result);
+    return result;
   }
 
   private logTrade(walletId: string, action: string, result: OrderResult): void {

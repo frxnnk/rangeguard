@@ -198,4 +198,52 @@ export class HedgesRepository {
     const result = stmt.get() as { total: number };
     return result.total;
   }
+
+  /** Aggregate stats per pool: total trades, total PnL, total fees, win/loss counts */
+  statsByPool(poolConfigId: string): {
+    totalTrades: number;
+    totalPnl: number;
+    totalFees: number;
+    wins: number;
+    losses: number;
+  } {
+    const stmt = this.db.prepare(`
+      SELECT
+        COUNT(*) as totalTrades,
+        COALESCE(SUM(CASE WHEN status IN ('closed','liquidated') AND realized_pnl IS NOT NULL THEN CAST(realized_pnl AS REAL) ELSE 0 END), 0) as totalPnl,
+        COALESCE(SUM(CAST(fees AS REAL)), 0) as totalFees,
+        COALESCE(SUM(CASE WHEN status IN ('closed','liquidated') AND realized_pnl IS NOT NULL AND CAST(realized_pnl AS REAL) >= 0 THEN 1 ELSE 0 END), 0) as wins,
+        COALESCE(SUM(CASE WHEN status IN ('closed','liquidated') AND realized_pnl IS NOT NULL AND CAST(realized_pnl AS REAL) < 0 THEN 1 ELSE 0 END), 0) as losses
+      FROM hedge_trades
+      WHERE pool_config_id = ?
+    `);
+    const row = stmt.get(poolConfigId) as {
+      totalTrades: number;
+      totalPnl: number;
+      totalFees: number;
+      wins: number;
+      losses: number;
+    };
+    return row;
+  }
+
+  /** Delete all closed/liquidated trades for a specific pool */
+  deleteHistoryByPool(poolConfigId: string): number {
+    const stmt = this.db.prepare(`
+      DELETE FROM hedge_trades
+      WHERE pool_config_id = ? AND status IN ('closed', 'liquidated')
+    `);
+    const result = stmt.run(poolConfigId);
+    return result.changes;
+  }
+
+  /** Delete all closed/liquidated trades across all pools */
+  deleteAllHistory(): number {
+    const stmt = this.db.prepare(`
+      DELETE FROM hedge_trades
+      WHERE status IN ('closed', 'liquidated')
+    `);
+    const result = stmt.run();
+    return result.changes;
+  }
 }

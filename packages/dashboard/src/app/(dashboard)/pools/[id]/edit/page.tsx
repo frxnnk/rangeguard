@@ -61,6 +61,14 @@ export default function EditPoolPage() {
     protectionWalletId: '',
     profitWalletEnabled: true,
     protectionActive: true,
+    // Range trading (R10)
+    tradingEnabled: false,
+    tradingLeverage: 5,
+    tradingStopLossPercent: '2.0',
+    tradingTrailingPercent: '1.5',
+    tradingEntryZonePercent: '25',
+    tradingCooldownSeconds: '300',
+    tradingMaxSizeUsd: '1000',
   });
 
   useEffect(() => {
@@ -70,7 +78,7 @@ export default function EditPoolPage() {
     ])
       .then(([pool, w]) => {
         if (pool.error) {
-          setError('Pool not found');
+          setError('Pool no encontrado');
           return;
         }
         setForm({
@@ -88,12 +96,19 @@ export default function EditPoolPage() {
           protectionWalletId: pool.protectionWalletId,
           profitWalletEnabled: pool.profitWalletEnabled,
           protectionActive: pool.protectionActive,
+          tradingEnabled: pool.tradingEnabled ?? false,
+          tradingLeverage: pool.tradingLeverage ?? 5,
+          tradingStopLossPercent: (pool.tradingStopLossPercent ?? 2.0).toString(),
+          tradingTrailingPercent: (pool.tradingTrailingPercent ?? 1.5).toString(),
+          tradingEntryZonePercent: (pool.tradingEntryZonePercent ?? 25).toString(),
+          tradingCooldownSeconds: (pool.tradingCooldownSeconds ?? 300).toString(),
+          tradingMaxSizeUsd: (pool.tradingMaxSizeUsd ?? 1000).toString(),
         });
         setWallets(w);
         setLoading(false);
       })
       .catch(() => {
-        setError('Failed to load pool data');
+        setError('Error al cargar datos del pool');
         setLoading(false);
       });
   }, [id]);
@@ -122,6 +137,13 @@ export default function EditPoolPage() {
         protectionWalletId: form.protectionWalletId,
         profitWalletEnabled: form.profitWalletEnabled,
         protectionActive: form.protectionActive,
+        tradingEnabled: form.tradingEnabled,
+        tradingLeverage: form.tradingLeverage,
+        tradingStopLossPercent: parseFloat(form.tradingStopLossPercent),
+        tradingTrailingPercent: parseFloat(form.tradingTrailingPercent),
+        tradingEntryZonePercent: parseFloat(form.tradingEntryZonePercent),
+        tradingCooldownSeconds: parseInt(form.tradingCooldownSeconds),
+        tradingMaxSizeUsd: parseFloat(form.tradingMaxSizeUsd),
       };
 
       const res = await fetch(`/api/pools/${id}`, {
@@ -159,8 +181,8 @@ export default function EditPoolPage() {
   return (
     <div>
       <div className="mb-6">
-        <p className="text-sm text-muted-foreground mb-1">Pool / Edit Pool</p>
-        <h1 className="text-2xl font-bold text-foreground">Edit Pool</h1>
+        <p className="text-sm text-muted-foreground mb-1">Pool / Editar Pool</p>
+        <h1 className="text-2xl font-bold text-foreground">Editar Pool</h1>
       </div>
 
       <Card className="max-w-2xl">
@@ -175,7 +197,7 @@ export default function EditPoolPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Network</Label>
+                <Label>Red</Label>
                 <Select
                   value={form.chainId.toString()}
                   onValueChange={(value) => {
@@ -197,7 +219,7 @@ export default function EditPoolPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Fee Tier</Label>
+                <Label>Nivel de Fee</Label>
                 <Select
                   value={form.feeTier.toString()}
                   onValueChange={(value) => setForm((f) => ({ ...f, feeTier: parseInt(value) }))}
@@ -217,7 +239,7 @@ export default function EditPoolPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Pool Address</Label>
+              <Label>Dirección del Pool</Label>
               <Input
                 type="text"
                 value={form.poolAddress}
@@ -228,7 +250,7 @@ export default function EditPoolPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Range Lower ($)</Label>
+                <Label>Rango Inferior ($)</Label>
                 <Input
                   type="number"
                   step="any"
@@ -239,7 +261,7 @@ export default function EditPoolPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Range Upper ($)</Label>
+                <Label>Rango Superior ($)</Label>
                 <Input
                   type="number"
                   step="any"
@@ -252,7 +274,7 @@ export default function EditPoolPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Pool Amount (USD)</Label>
+              <Label>Monto del Pool (USD)</Label>
               <Input
                 type="number"
                 step="any"
@@ -264,7 +286,7 @@ export default function EditPoolPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Name (optional)</Label>
+              <Label>Nombre (opcional)</Label>
               <Input
                 type="text"
                 value={form.name}
@@ -275,7 +297,7 @@ export default function EditPoolPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Leverage</Label>
+                <Label>Apalancamiento</Label>
                 <Select
                   value={form.leverage.toString()}
                   onValueChange={(value) => setForm((f) => ({ ...f, leverage: parseInt(value) }))}
@@ -290,7 +312,7 @@ export default function EditPoolPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Protection Direction</Label>
+                <Label>Dirección de Protección</Label>
                 <Select
                   value={form.protectionDirection}
                   onValueChange={(value) =>
@@ -304,22 +326,22 @@ export default function EditPoolPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="below">Below only (Short)</SelectItem>
-                    <SelectItem value="above">Above only (Long)</SelectItem>
-                    <SelectItem value="both">Both directions</SelectItem>
+                    <SelectItem value="below">Solo abajo (Short)</SelectItem>
+                    <SelectItem value="above">Solo arriba (Long)</SelectItem>
+                    <SelectItem value="both">Ambas direcciones</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Protection Wallet</Label>
+              <Label>Wallet de Protección</Label>
               <Select
                 value={form.protectionWalletId}
                 onValueChange={(value) => setForm((f) => ({ ...f, protectionWalletId: value }))}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select wallet\u2026" />
+                  <SelectValue placeholder="Seleccionar wallet\u2026" />
                 </SelectTrigger>
                 <SelectContent>
                   {protectionWallets.map((w) => (
@@ -341,7 +363,7 @@ export default function EditPoolPage() {
                   }
                 />
                 <Label htmlFor="profit-wallet" className="cursor-pointer">
-                  Mirror on profit wallet
+                  Replicar en wallet de ganancia
                 </Label>
               </div>
               <div className="flex items-center gap-2">
@@ -353,17 +375,141 @@ export default function EditPoolPage() {
                   }
                 />
                 <Label htmlFor="protection-active" className="cursor-pointer">
-                  Protection active
+                  Protección activa
                 </Label>
               </div>
             </div>
 
+            {/* Range Trading Config (R10) */}
+            <div className="border-t border-border pt-6 mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Trading dentro del Rango</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Opera mean-reversion dentro del rango LP (long abajo, short arriba)
+                  </p>
+                </div>
+                <Switch
+                  id="trading-enabled"
+                  checked={form.tradingEnabled}
+                  onCheckedChange={(checked) =>
+                    setForm((f) => ({ ...f, tradingEnabled: checked }))
+                  }
+                />
+              </div>
+
+              {form.tradingEnabled && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Apalancamiento Trading</Label>
+                      <Select
+                        value={form.tradingLeverage.toString()}
+                        onValueChange={(value) =>
+                          setForm((f) => ({ ...f, tradingLeverage: parseInt(value) }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="2">2x</SelectItem>
+                          <SelectItem value="3">3x</SelectItem>
+                          <SelectItem value="5">5x</SelectItem>
+                          <SelectItem value="10">10x</SelectItem>
+                          <SelectItem value="20">20x</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tamaño Máximo (USD)</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={form.tradingMaxSizeUsd}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tradingMaxSizeUsd: e.target.value }))
+                        }
+                        className="bg-muted border-border text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Stop Loss (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={form.tradingStopLossPercent}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tradingStopLossPercent: e.target.value }))
+                        }
+                        className="bg-muted border-border text-foreground"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Cierre forzado si el precio va en contra este %
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Trailing Stop (%)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={form.tradingTrailingPercent}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tradingTrailingPercent: e.target.value }))
+                        }
+                        className="bg-muted border-border text-foreground"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Se arrastra detrás del mejor precio alcanzado
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Zona de Entrada (%)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={form.tradingEntryZonePercent}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tradingEntryZonePercent: e.target.value }))
+                        }
+                        className="bg-muted border-border text-foreground"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        % del rango que define zona baja (long) y alta (short)
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Cooldown (segundos)</Label>
+                      <Input
+                        type="number"
+                        step="1"
+                        value={form.tradingCooldownSeconds}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, tradingCooldownSeconds: e.target.value }))
+                        }
+                        className="bg-muted border-border text-foreground"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Espera entre operaciones (evitar overtrade)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <Button type="submit" className="flex-1" disabled={submitting}>
-                {submitting ? 'Saving\u2026' : 'Save Changes'}
+                {submitting ? 'Guardando\u2026' : 'Guardar Cambios'}
               </Button>
               <Button type="button" variant="secondary" onClick={() => router.back()}>
-                Cancel
+                Cancelar
               </Button>
             </div>
           </form>

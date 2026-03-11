@@ -5,6 +5,8 @@ import type {
   RangeReturnEvent,
   HedgeOpenedEvent,
   HedgeClosedEvent,
+  RangeTradeOpenedEvent,
+  RangeTradeClosedEvent,
   WalletBalanceUpdate,
 } from '@trading-bot/common';
 
@@ -14,6 +16,8 @@ interface BotEvents {
   'range-return': (data: RangeReturnEvent) => void;
   'hedge-opened': (data: HedgeOpenedEvent) => void;
   'hedge-closed': (data: HedgeClosedEvent) => void;
+  'range-trade-opened': (data: RangeTradeOpenedEvent) => void;
+  'range-trade-closed': (data: RangeTradeClosedEvent) => void;
   'wallet-balance': (data: WalletBalanceUpdate) => void;
 }
 

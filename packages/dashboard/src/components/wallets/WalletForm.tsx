@@ -35,7 +35,7 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wallets'] });
-      toast.success('Wallet added');
+      toast.success('Billetera agregada');
       onClose();
     },
     onError: (err: Error) => {
@@ -49,11 +49,11 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
     setError(null);
 
     if (!form.alias.trim()) {
-      setError('Alias is required');
+      setError('El alias es obligatorio');
       return;
     }
     if (!form.address.trim() || !form.address.startsWith('0x')) {
-      setError('Valid Ethereum address required (0x...)');
+      setError('Dirección Ethereum válida requerida (0x...)');
       return;
     }
 
@@ -63,9 +63,9 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Add Wallet</CardTitle>
+        <CardTitle>Agregar Billetera</CardTitle>
         <Button variant="ghost" size="sm" onClick={onClose}>
-          Cancel
+          Cancelar
         </Button>
       </CardHeader>
       <CardContent>
@@ -79,6 +79,7 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label>Alias</Label>
+
             <Input
               type="text"
               value={form.alias}
@@ -90,7 +91,7 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <Label>Address</Label>
+            <Label>Dirección</Label>
             <Input
               type="text"
               value={form.address}
@@ -103,7 +104,7 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Type</Label>
+              <Label>Tipo</Label>
               <select
                 value={form.walletType}
                 onChange={(e) =>
@@ -111,12 +112,12 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
                 }
                 className="w-full bg-muted border-border rounded-lg px-3 py-2 text-foreground text-sm focus:outline-none focus:border-ring"
               >
-                <option value="protection">Protection</option>
-                <option value="profit">Profit</option>
+                <option value="protection">Protección</option>
+                <option value="profit">Ganancia</option>
               </select>
             </div>
             <div>
-              <Label>Low Balance Threshold ($)</Label>
+              <Label>Alerta de Saldo Bajo ($)</Label>
               <Input
                 type="number"
                 step="any"
@@ -129,14 +130,14 @@ export function WalletForm({ onClose }: { onClose: () => void }) {
 
           <div className="flex gap-3">
             <Button type="submit" disabled={createMutation.isPending} className="flex-1">
-              {createMutation.isPending ? 'Adding...' : 'Add Wallet'}
+              {createMutation.isPending ? 'Agregando...' : 'Agregar Billetera'}
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            After adding, run{' '}
-            <code className="text-green-400 bg-muted px-1 rounded">pnpm setup-keys</code> to add the
-            private key to the vault.
+            Después de agregar, ejecutá{' '}
+            <code className="text-green-400 bg-muted px-1 rounded">pnpm setup-keys</code> para
+            agregar la clave privada al vault.
           </p>
         </form>
       </CardContent>

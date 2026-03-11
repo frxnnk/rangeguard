@@ -17,13 +17,13 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
-  { href: '/', label: 'Overview', icon: LayoutGrid },
+  { href: '/', label: 'Resumen', icon: LayoutGrid },
   { href: '/pools', label: 'Pools', icon: Layers },
-  { href: '/wallets', label: 'Wallets', icon: Wallet },
-  { href: '/hedges', label: 'Hedges', icon: Shield },
-  { href: '/history', label: 'History', icon: Clock },
-  { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/about', label: 'About', icon: Info },
+  { href: '/wallets', label: 'Billeteras', icon: Wallet },
+  { href: '/hedges', label: 'Coberturas', icon: Shield },
+  { href: '/history', label: 'Historial', icon: Clock },
+  { href: '/settings', label: 'Configuración', icon: Settings },
+  { href: '/about', label: 'Acerca de', icon: Info },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -42,7 +42,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <>
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold text-sidebar-foreground">Trading Bot</h1>
-        <p className="text-xs text-muted-foreground mt-1">Liquidity Pool Hedging</p>
+        <p className="text-xs text-muted-foreground mt-1">Cobertura de Pools de Liquidez</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -74,7 +74,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             }`}
           />
           <span className="text-xs text-muted-foreground">
-            {isRunning ? 'Bot Running' : 'Bot Offline'}
+            {isRunning ? 'Bot Activo' : 'Bot Inactivo'}
           </span>
         </div>
         <button
@@ -86,7 +86,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
         >
           <LogOut className="size-3.5" />
-          Logout
+          Cerrar sesión
         </button>
       </div>
     </>
@@ -108,7 +108,7 @@ export function Sidebar() {
       <button
         onClick={() => setMobileOpen(true)}
         className="fixed top-4 left-4 z-50 md:hidden p-2 rounded-lg bg-card border border-border"
-        aria-label="Open menu"
+        aria-label="Abrir menú"
       >
         <Menu className="size-5" aria-hidden="true" />
       </button>
@@ -119,7 +119,7 @@ export function Sidebar() {
           <button
             className="absolute inset-0 bg-black/60 cursor-default"
             onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
+            aria-label="Cerrar menú"
           />
           <aside className="relative z-50 h-screen w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
             <SidebarContent onNavigate={() => setMobileOpen(false)} />

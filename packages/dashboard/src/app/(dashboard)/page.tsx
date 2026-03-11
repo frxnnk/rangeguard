@@ -48,37 +48,37 @@ export default function OverviewPage() {
 
   const cards = [
     {
-      label: 'Active Pools',
+      label: 'Pools Activos',
       value: `${stats.activePools}/${stats.totalPools}`,
       icon: Activity,
       accent: 'text-blue-400',
     },
     {
-      label: 'In Range',
+      label: 'En Rango',
       value: stats.inRangePools.toString(),
       icon: CircleCheck,
       accent: 'text-green-400',
     },
     {
-      label: 'Open Hedges',
+      label: 'Coberturas Abiertas',
       value: stats.openHedges.toString(),
       icon: Shield,
       accent: 'text-yellow-400',
     },
     {
-      label: 'Realized P&L',
+      label: 'PnL Realizado',
       value: `$${pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
       accent: pnl >= 0 ? 'text-green-400' : 'text-red-400',
     },
     {
-      label: 'Unrealized P&L',
+      label: 'PnL No Realizado',
       value: `$${unrealizedPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: TrendingUp,
       accent: unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400',
     },
     {
-      label: 'False Breakouts',
+      label: 'Falsas Rupturas',
       value: stats.falseBreakouts.toString(),
       icon: AlertTriangle,
       accent: 'text-orange-400',
@@ -87,7 +87,7 @@ export default function OverviewPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-foreground mb-6">Overview</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-6">Resumen</h1>
 
       {stats.lowBalanceWallets.length > 0 && (
         <div className="mb-6 space-y-2">
@@ -95,7 +95,7 @@ export default function OverviewPage() {
             <AlertBanner
               key={w.alias}
               type="warning"
-              message={`Wallet "${w.alias}" has low balance: $${parseFloat(w.available).toFixed(2)} (threshold: $${w.threshold})`}
+              message={`La wallet "${w.alias}" tiene saldo bajo: $${parseFloat(w.available).toFixed(2)} (umbral: $${w.threshold})`}
             />
           ))}
         </div>
@@ -117,7 +117,7 @@ export default function OverviewPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Cumulative P&L</CardTitle>
+          <CardTitle>PnL Acumulado</CardTitle>
         </CardHeader>
         <CardContent>
           <PnLChart data={pnlData} />

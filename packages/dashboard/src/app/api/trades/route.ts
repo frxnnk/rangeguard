@@ -15,3 +15,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch trades' }, { status: 500 });
   }
 }
+
+export async function DELETE() {
+  try {
+    const deleted = hedgesRepo.deleteAllHistory();
+    return NextResponse.json({ deleted });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to delete history' }, { status: 500 });
+  }
+}

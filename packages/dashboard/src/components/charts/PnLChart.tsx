@@ -24,7 +24,7 @@ interface PnLChartProps {
 
 export function PnLChart({ data }: PnLChartProps) {
   if (data.length === 0) {
-    return <div className="text-muted-foreground text-center py-8">No P&L data yet</div>;
+    return <div className="text-muted-foreground text-center py-8">Sin datos de PnL</div>;
   }
 
   return (

@@ -34,6 +34,7 @@ export function loadConfig(): AppConfig {
     },
     alertWebhookUrl: process.env.ALERT_WEBHOOK_URL || undefined,
     logLevel: process.env.LOG_LEVEL || 'info',
+    dryRun: process.env.DRY_RUN === 'true',
   };
 }
 
