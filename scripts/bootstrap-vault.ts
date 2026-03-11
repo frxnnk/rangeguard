@@ -18,28 +18,15 @@
  */
 import { resolve } from 'path';
 import { homedir } from 'os';
-import { createECDH } from 'crypto';
-import { createRequire } from 'module';
+import { privateKeyToAccount } from 'viem/accounts';
 import { Vault } from '../packages/security/src/vault.js';
 import { getDatabase, closeDatabase } from '../packages/db/src/connection.js';
 import { runMigrations } from '../packages/db/src/migrations/001_initial.js';
 import { WalletsRepository } from '../packages/db/src/repositories/wallets.repo.js';
 
-// Resolve keccak from hedging-engine's transitive deps
-const hedgingRequire = createRequire(
-  resolve(import.meta.dirname!, '..', 'packages', 'hedging-engine', 'src', 'index.ts'),
-);
-const { keccak_256 } = hedgingRequire('@noble/hashes/sha3') as {
-  keccak_256: (data: Uint8Array) => Uint8Array;
-};
-
 function deriveAddress(privateKeyHex: string): string {
-  const privKeyBuf = Buffer.from(privateKeyHex.replace(/^0x/, ''), 'hex');
-  const ec = createECDH('secp256k1');
-  ec.setPrivateKey(privKeyBuf);
-  const pubKey = ec.getPublicKey().subarray(1); // remove 0x04 prefix
-  const hash = keccak_256(pubKey);
-  return '0x' + Buffer.from(hash).subarray(-20).toString('hex');
+  const account = privateKeyToAccount(privateKeyHex as `0x${string}`);
+  return account.address.toLowerCase();
 }
 
 // --- Config ---

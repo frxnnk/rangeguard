@@ -29,6 +29,9 @@ importers:
       typescript-eslint:
         specifier: ^8.57.0
         version: 8.57.0(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3)
+      viem:
+        specifier: ^2.47.1
+        version: 2.47.1(typescript@5.9.3)
       vitest:
         specifier: ^2.1.9
         version: 2.1.9(@types/node@25.4.0)(lightningcss@1.31.1)
