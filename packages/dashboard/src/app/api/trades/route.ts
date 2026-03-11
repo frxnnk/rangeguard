@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const falseBreakouts = hedgesRepo.countFalseBreakouts();
 
     return NextResponse.json({ trades, falseBreakouts });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch trades' }, { status: 500 });
   }
 }
@@ -20,7 +20,7 @@ export async function DELETE() {
   try {
     const deleted = hedgesRepo.deleteAllHistory();
     return NextResponse.json({ deleted });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete history' }, { status: 500 });
   }
 }

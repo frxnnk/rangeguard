@@ -1,4 +1,3 @@
-import type { PublicClient } from 'viem';
 import {
   type PoolConfig,
   UNISWAP_V3_POOL_ABI,
@@ -215,7 +214,7 @@ export class PoolWatcher {
 
   /** Stop all watchers */
   unwatchAll(): void {
-    for (const [key, handle] of this.watchers) {
+    for (const [_key, handle] of this.watchers) {
       handle.unwatch?.();
       if (handle.pollingTimer) clearInterval(handle.pollingTimer);
     }

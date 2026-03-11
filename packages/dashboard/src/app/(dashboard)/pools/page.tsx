@@ -9,6 +9,24 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Layers } from 'lucide-react';
 
+interface PoolRow {
+  id: string;
+  name: string;
+  chainName: string;
+  token0Symbol: string;
+  token1Symbol: string;
+  feeTier: number;
+  rangeLower: number;
+  rangeUpper: number;
+  poolAmount: string;
+  hedgeAsset: string;
+  leverage: number;
+  protectionDirection: string;
+  protectionActive: boolean;
+  status: string;
+  currentPrice?: string;
+}
+
 export default function PoolsPage() {
   const queryClient = useQueryClient();
 
@@ -67,7 +85,7 @@ export default function PoolsPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {pools.map((pool: any) => (
+          {pools.map((pool: PoolRow) => (
             <PoolCard
               key={pool.id}
               pool={pool}

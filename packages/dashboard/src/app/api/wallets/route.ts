@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const wallets = walletsRepo.findAll();
     return NextResponse.json(wallets);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch wallets' }, { status: 500 });
   }
 }

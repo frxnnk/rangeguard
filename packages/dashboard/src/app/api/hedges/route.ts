@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(enriched);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch hedges' }, { status: 500 });
   }
 }

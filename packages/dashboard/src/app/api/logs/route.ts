@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
     const logs = logsRepo.findRecent(limit, level);
     return NextResponse.json(logs);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
   }
 }

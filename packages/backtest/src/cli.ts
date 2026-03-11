@@ -26,7 +26,7 @@
 import { resolve } from 'path';
 import { loadCSV, fetchBinanceKlines, candlesToPrices, parsePeriod } from './data-loader.js';
 import { runBacktest, type BacktestConfig } from './orchestrator.js';
-import { analyze, type Trade } from './analyzer.js';
+import { analyze } from './analyzer.js';
 import { generateMarkdownReport, writeReport, type ReportData } from './reporter.js';
 
 function parseArgs(args: string[]): Record<string, string> {

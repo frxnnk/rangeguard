@@ -5,14 +5,10 @@
  */
 import { resolve } from 'path';
 import { resolveEnv, defaultDbPath } from '../packages/common/src/utils/env.js';
-import {
-  getDatabase,
-  closeDatabase,
-} from '../packages/db/src/connection.js';
+import { getDatabase, closeDatabase } from '../packages/db/src/connection.js';
 import { runMigrations } from '../packages/db/src/migrations/001_initial.js';
 import { PoolsRepository } from '../packages/db/src/repositories/pools.repo.js';
 import { WalletsRepository } from '../packages/db/src/repositories/wallets.repo.js';
-import { HedgesRepository } from '../packages/db/src/repositories/hedges.repo.js';
 import { PnlRepository } from '../packages/db/src/repositories/pnl.repo.js';
 
 const monorepoRoot = resolve(import.meta.dirname!, '..');
@@ -38,7 +34,6 @@ db.exec(`
 
 const walletsRepo = new WalletsRepository(db);
 const poolsRepo = new PoolsRepository(db);
-const hedgesRepo = new HedgesRepository(db);
 const pnlRepo = new PnlRepository(db);
 
 // --- Wallets ---
@@ -148,28 +143,88 @@ const closeHedge = db.prepare(`
 
 // Hedge 1: 3 days ago — profitable, range return (short ETH @ $2410 → closed @ $2350)
 const h1Id = 'demo-hedge-001';
-insertHedge.run(h1Id, pool1.id, wallet1.id, 'protection', 'ETH', 'short', '0.50', '2410.00', 10, '0.0422', now - 3 * 86400000);
+insertHedge.run(
+  h1Id,
+  pool1.id,
+  wallet1.id,
+  'protection',
+  'ETH',
+  'short',
+  '0.50',
+  '2410.00',
+  10,
+  '0.0422',
+  now - 3 * 86400000,
+);
 closeHedge.run('2350.00', '30.00', 'range_return', 0, now - 3 * 86400000 + 7200000, 0.0411, h1Id);
 
 // Hedge 2: 2 days ago — false breakout loss (short ETH @ $2420 → closed @ $2450)
 const h2Id = 'demo-hedge-002';
-insertHedge.run(h2Id, pool1.id, wallet1.id, 'protection', 'ETH', 'short', '0.30', '2420.00', 10, '0.0254', now - 2 * 86400000);
+insertHedge.run(
+  h2Id,
+  pool1.id,
+  wallet1.id,
+  'protection',
+  'ETH',
+  'short',
+  '0.30',
+  '2420.00',
+  10,
+  '0.0254',
+  now - 2 * 86400000,
+);
 closeHedge.run('2450.00', '-9.00', 'range_return', 1, now - 2 * 86400000 + 3600000, 0.0257, h2Id);
 
 // Hedge 3: 1.5 days ago — profitable on pool2 (short ETH @ $1790 → $1750)
 const h3Id = 'demo-hedge-003';
-insertHedge.run(h3Id, pool2.id, wallet2.id, 'protection', 'ETH', 'short', '1.20', '1790.00', 5, '0.0752', now - 1.5 * 86400000);
+insertHedge.run(
+  h3Id,
+  pool2.id,
+  wallet2.id,
+  'protection',
+  'ETH',
+  'short',
+  '1.20',
+  '1790.00',
+  5,
+  '0.0752',
+  now - 1.5 * 86400000,
+);
 closeHedge.run('1750.00', '48.00', 'range_return', 0, now - 1.5 * 86400000 + 5400000, 0.0735, h3Id);
 
 // Hedge 4: 18 hours ago — manual close (short ETH @ $2405 → $2390)
 const h4Id = 'demo-hedge-004';
-insertHedge.run(h4Id, pool1.id, wallet1.id, 'protection', 'ETH', 'short', '0.45', '2405.00', 10, '0.0379', now - 18 * 3600000);
+insertHedge.run(
+  h4Id,
+  pool1.id,
+  wallet1.id,
+  'protection',
+  'ETH',
+  'short',
+  '0.45',
+  '2405.00',
+  10,
+  '0.0379',
+  now - 18 * 3600000,
+);
 closeHedge.run('2390.00', '6.75', 'manual', 0, now - 18 * 3600000 + 1800000, 0.0376, h4Id);
 
 // --- Open hedge (active) ---
 console.log('Creating active hedge...');
 const h5Id = 'demo-hedge-005';
-insertHedge.run(h5Id, pool1.id, wallet1.id, 'protection', 'ETH', 'short', '0.55', '2415.00', 10, '0.0465', now - 45 * 60000);
+insertHedge.run(
+  h5Id,
+  pool1.id,
+  wallet1.id,
+  'protection',
+  'ETH',
+  'short',
+  '0.55',
+  '2415.00',
+  10,
+  '0.0465',
+  now - 45 * 60000,
+);
 
 // Set pool1 status to out-of-range since it has an open hedge
 poolsRepo.updateStatus(pool1.id, 'out-of-range-above', '2430.00');

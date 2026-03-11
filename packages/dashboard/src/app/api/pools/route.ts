@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const pools = poolsRepo.findAll();
     return NextResponse.json(pools);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch pools' }, { status: 500 });
   }
 }

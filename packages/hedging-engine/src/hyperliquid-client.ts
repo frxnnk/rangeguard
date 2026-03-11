@@ -308,14 +308,14 @@ export class HyperliquidClient {
     const state = await publicClient.clearinghouseState({ user: client.address as `0x${string}` });
 
     return state.assetPositions
-      .filter((p: any) => parseFloat(p.position.szi) !== 0)
-      .map((p: any) => ({
+      .filter((p) => parseFloat(p.position.szi) !== 0)
+      .map((p) => ({
         asset: p.position.coin,
         size: p.position.szi,
         entryPrice: p.position.entryPx,
         unrealizedPnl: p.position.unrealizedPnl,
-        leverage: parseInt(p.position.leverage?.value ?? '1'),
-        liquidationPrice: p.position.liquidationPx,
+        leverage: Number(p.position.leverage?.value ?? 1),
+        liquidationPrice: p.position.liquidationPx ?? undefined,
       }));
   }
 
@@ -337,7 +337,7 @@ export class HyperliquidClient {
         const spotState = await publicClient.spotClearinghouseState({
           user: client.address as `0x${string}`,
         });
-        const usdcBalance = spotState.balances?.find((b: any) => b.coin === 'USDC');
+        const usdcBalance = spotState.balances?.find((b) => b.coin === 'USDC');
         if (usdcBalance) {
           accountValue = parseFloat(usdcBalance.total ?? '0');
         }

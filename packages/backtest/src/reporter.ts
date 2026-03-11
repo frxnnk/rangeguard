@@ -67,10 +67,14 @@ export function generateMarkdownReport(data: ReportData): string {
   if (hedgeStats.totalTrades > 0) {
     lines.push('## Hedge Strategy');
     lines.push('');
-    lines.push(`- **Total Trades**: ${hedgeStats.totalTrades} (${hedgeStats.wins}W / ${hedgeStats.losses}L)`);
+    lines.push(
+      `- **Total Trades**: ${hedgeStats.totalTrades} (${hedgeStats.wins}W / ${hedgeStats.losses}L)`,
+    );
     lines.push(`- **Avg Win**: $${hedgeStats.avgWin.toFixed(2)}`);
     lines.push(`- **Avg Loss**: $${hedgeStats.avgLoss.toFixed(2)}`);
-    lines.push(`- **False Breakouts**: ${hedgeStats.falseBreakouts} (${hedgeStats.falseBreakoutRate.toFixed(1)}%)`);
+    lines.push(
+      `- **False Breakouts**: ${hedgeStats.falseBreakouts} (${hedgeStats.falseBreakoutRate.toFixed(1)}%)`,
+    );
     lines.push(`- **Avg Holding Time**: ${fmtDuration(hedgeStats.avgHoldingTimeMs)}`);
     lines.push('');
   }
@@ -79,7 +83,9 @@ export function generateMarkdownReport(data: ReportData): string {
   if (rangeStats.totalTrades > 0) {
     lines.push('## Range Trading Strategy');
     lines.push('');
-    lines.push(`- **Total Trades**: ${rangeStats.totalTrades} (${rangeStats.wins}W / ${rangeStats.losses}L)`);
+    lines.push(
+      `- **Total Trades**: ${rangeStats.totalTrades} (${rangeStats.wins}W / ${rangeStats.losses}L)`,
+    );
     lines.push(`- **Avg Win**: $${rangeStats.avgWin.toFixed(2)}`);
     lines.push(`- **Avg Loss**: $${rangeStats.avgLoss.toFixed(2)}`);
     lines.push(`- **Avg Holding Time**: ${fmtDuration(rangeStats.avgHoldingTimeMs)}`);
@@ -157,8 +163,12 @@ function renderAsciiEquityCurve(curve: Array<{ timestamp: number; equity: number
   // Build chart
   const lines: string[] = [];
   for (let row = height - 1; row >= 0; row--) {
-    const threshold = min + (range * row) / (height - 1);
-    let line = row === height - 1 ? `$${max.toFixed(0).padStart(7)} ` : row === 0 ? `$${min.toFixed(0).padStart(7)} ` : '         ';
+    let line =
+      row === height - 1
+        ? `$${max.toFixed(0).padStart(7)} `
+        : row === 0
+          ? `$${min.toFixed(0).padStart(7)} `
+          : '         ';
     for (const val of sampled) {
       const normalizedRow = Math.round(((val - min) / range) * (height - 1));
       line += normalizedRow >= row ? '#' : ' ';

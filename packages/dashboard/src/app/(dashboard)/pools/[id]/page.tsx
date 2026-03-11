@@ -16,6 +16,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShieldOff, DollarSign, TrendingUp, Activity, Trash2, Pencil } from 'lucide-react';
 
+interface HedgeRow {
+  id: string;
+  asset: string;
+  side: string;
+  size: string;
+  entryPrice: string;
+  leverage: number;
+  status: string;
+  walletType: string;
+  fees: string;
+  realizedPnl?: string;
+  unrealizedPnl?: string;
+  unrealizedPnlUpdatedAt?: number;
+  openedAt: number;
+}
+
 const FEE_LABELS: Record<number, string> = {
   100: '0.01%',
   500: '0.05%',
@@ -44,7 +60,13 @@ export default function PoolDetailPage() {
   });
 
   const { data: costsData } = useQuery<{
-    stats: { totalTrades: number; totalPnl: number; totalFees: number; wins: number; losses: number };
+    stats: {
+      totalTrades: number;
+      totalPnl: number;
+      totalFees: number;
+      wins: number;
+      losses: number;
+    };
   }>({
     queryKey: ['pool-costs', id],
     queryFn: () => fetch(`/api/pools/${id}/costs`).then((r) => r.json()),
@@ -314,7 +336,11 @@ export default function PoolDetailPage() {
               size="sm"
               className="text-xs text-destructive"
               onClick={() => {
-                if (confirm('¿Eliminar todo el historial de este pool? Esta acción no se puede deshacer.')) {
+                if (
+                  confirm(
+                    '¿Eliminar todo el historial de este pool? Esta acción no se puede deshacer.',
+                  )
+                ) {
                   deleteHistoryMutation.mutate();
                 }
               }}
@@ -337,7 +363,7 @@ export default function PoolDetailPage() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {hedges.map((hedge: any) => (
+            {hedges.map((hedge: HedgeRow) => (
               <HedgeCard key={hedge.id} hedge={hedge} />
             ))}
           </div>

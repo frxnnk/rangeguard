@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { resolveEnv } from '@rangeguard/common';
 import { pnlRepo, settingsRepo } from '../db';
 
 export async function GET() {
@@ -25,7 +24,7 @@ export async function GET() {
       ageMs: age,
       env,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ running: false, lastSeen: null, env: 'testnet' }, { status: 200 });
   }
 }

@@ -19,7 +19,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     });
 
     return NextResponse.json(series);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch wallet PnL' }, { status: 500 });
   }
 }

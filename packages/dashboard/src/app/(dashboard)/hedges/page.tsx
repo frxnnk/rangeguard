@@ -8,6 +8,22 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ShieldCheck } from 'lucide-react';
 
+interface HedgeRow {
+  id: string;
+  asset: string;
+  side: string;
+  size: string;
+  entryPrice: string;
+  leverage: number;
+  status: string;
+  walletType: string;
+  fees: string;
+  realizedPnl?: string;
+  unrealizedPnl?: string;
+  unrealizedPnlUpdatedAt?: number;
+  openedAt: number;
+}
+
 export default function HedgesPage() {
   const queryClient = useQueryClient();
 
@@ -58,7 +74,7 @@ export default function HedgesPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {hedges.map((hedge: any) => (
+          {hedges.map((hedge: HedgeRow) => (
             <div key={hedge.id}>
               <HedgeCard hedge={hedge} />
               <div className="flex justify-end mt-2">
@@ -66,7 +82,11 @@ export default function HedgesPage() {
                   variant="link"
                   className="h-auto p-0 text-xs text-destructive"
                   onClick={() => {
-                    if (confirm('¿Cerrar esta cobertura manualmente? Se registrará el cierre en la base de datos.')) {
+                    if (
+                      confirm(
+                        '¿Cerrar esta cobertura manualmente? Se registrará el cierre en la base de datos.',
+                      )
+                    ) {
                       closeMutation.mutate(hedge.id);
                     }
                   }}

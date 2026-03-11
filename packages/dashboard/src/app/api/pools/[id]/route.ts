@@ -27,7 +27,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const { id } = await params;
     poolsRepo.delete(id);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete pool' }, { status: 500 });
   }
 }

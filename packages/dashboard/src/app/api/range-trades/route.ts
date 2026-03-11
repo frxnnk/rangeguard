@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     const trades = rangeTradesRepo.findHistory(limit, offset);
     return NextResponse.json({ trades });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch range trades' }, { status: 500 });
   }
 }
@@ -24,7 +24,7 @@ export async function DELETE() {
   try {
     const deleted = rangeTradesRepo.deleteAllHistory();
     return NextResponse.json({ deleted });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete range trade history' }, { status: 500 });
   }
 }

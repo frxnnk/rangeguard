@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TrailingStopManager, type TrailingStopTrigger } from './trailing-stop-manager.js';
 import type { RangeTrade } from '@rangeguard/common';
+import type { RangeTradesRepository } from '@rangeguard/db';
 
 function makeMockRepo() {
   return {
     updateTrailingStop: vi.fn(),
     findOpen: vi.fn().mockReturnValue([]),
-  } as any;
+  };
 }
 
 function makeLongTrade(overrides: Partial<RangeTrade> = {}): RangeTrade {
@@ -59,7 +60,9 @@ describe('TrailingStopManager', () => {
   beforeEach(() => {
     triggers = [];
     repo = makeMockRepo();
-    manager = new TrailingStopManager(repo, (t) => triggers.push(t));
+    manager = new TrailingStopManager(repo as unknown as RangeTradesRepository, (t) =>
+      triggers.push(t),
+    );
   });
 
   describe('long trades', () => {

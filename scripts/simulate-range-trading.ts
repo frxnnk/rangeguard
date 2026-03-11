@@ -13,7 +13,7 @@
  * With --live: uses real HyperliquidClient against testnet
  */
 
-import { resolve, dirname } from 'path';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -213,19 +213,25 @@ async function runSimulation(scenario: keyof typeof PRICE_SEQUENCES, useLive: bo
   const events: Array<{ type: string; data: RangeTradeOpenedEvent | RangeTradeClosedEvent }> = [];
 
   // Create engine
-  const engine = new RangeTradingEngine(poolsRepo, rangeTradesRepo, tradeLogRepo, hlClient as any, {
-    onTradeOpened: (event: RangeTradeOpenedEvent) => {
-      events.push({ type: 'opened', data: event });
-      logger.info(
-        { side: event.side, size: event.size, entryPrice: event.entryPrice },
-        'TRADE OPENED',
-      );
+  const engine = new RangeTradingEngine(
+    poolsRepo,
+    rangeTradesRepo,
+    tradeLogRepo,
+    hlClient as unknown as HyperliquidClient,
+    {
+      onTradeOpened: (event: RangeTradeOpenedEvent) => {
+        events.push({ type: 'opened', data: event });
+        logger.info(
+          { side: event.side, size: event.size, entryPrice: event.entryPrice },
+          'TRADE OPENED',
+        );
+      },
+      onTradeClosed: (event: RangeTradeClosedEvent) => {
+        events.push({ type: 'closed', data: event });
+        logger.info({ pnl: event.realizedPnl, reason: event.closeReason }, 'TRADE CLOSED');
+      },
     },
-    onTradeClosed: (event: RangeTradeClosedEvent) => {
-      events.push({ type: 'closed', data: event });
-      logger.info({ pnl: event.realizedPnl, reason: event.closeReason }, 'TRADE CLOSED');
-    },
-  });
+  );
 
   // Register pool
   engine.register(updatedConfig);

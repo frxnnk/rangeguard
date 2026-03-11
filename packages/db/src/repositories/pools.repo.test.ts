@@ -15,7 +15,7 @@ function createTestWallet(db: Database.Database): string {
   return wallet.id;
 }
 
-function poolData(walletId: string): any {
+function poolData(walletId: string) {
   return {
     name: 'ETH/USDC',
     chainId: 42161,
@@ -23,7 +23,7 @@ function poolData(walletId: string): any {
     poolAddress: '0xpool',
     token0Symbol: 'ETH',
     token1Symbol: 'USDC',
-    feeTier: 3000,
+    feeTier: 3000 as const,
     rangeLower: 1800,
     rangeUpper: 2200,
     poolAmount: '10000',

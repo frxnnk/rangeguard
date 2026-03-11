@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const trades = hedgesRepo.findByPool(id);
 
     return NextResponse.json({ stats, trades, hedgeStats, tradingStats });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch pool costs' }, { status: 500 });
   }
 }
@@ -35,7 +35,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const deletedHedges = hedgesRepo.deleteHistoryByPool(id);
     const deletedTrades = rangeTradesRepo.deleteHistoryByPool(id);
     return NextResponse.json({ deleted: deletedHedges + deletedTrades });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to delete pool history' }, { status: 500 });
   }
 }

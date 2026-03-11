@@ -1,7 +1,4 @@
-import { createLogger } from '@rangeguard/common';
 import type { PriceUpdate } from '@rangeguard/common';
-
-const logger = createLogger('price-feed');
 
 interface PriceEntry {
   price: string;

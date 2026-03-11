@@ -1,13 +1,6 @@
-import {
-  createPublicClient,
-  http,
-  webSocket,
-  type PublicClient,
-  type Transport,
-  type Chain,
-} from 'viem';
+import { createPublicClient, http, webSocket, type PublicClient, type Chain } from 'viem';
 import { mainnet, arbitrum, base, polygon } from 'viem/chains';
-import { createLogger, type ChainConfig, CHAINS } from '@rangeguard/common';
+import { createLogger, CHAINS } from '@rangeguard/common';
 
 const logger = createLogger('chain-client');
 

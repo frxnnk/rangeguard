@@ -2,7 +2,7 @@ import { resolve } from 'path';
 import { existsSync, readFileSync } from 'fs';
 import { createLogger, resolveEnv, defaultDbPath, defaultVaultPath } from '@rangeguard/common';
 import type { AppConfig } from '@rangeguard/common';
-import { SettingsRepository } from '@rangeguard/db';
+import type { SettingsRepository } from '@rangeguard/db';
 
 const logger = createLogger('config');
 
@@ -32,9 +32,7 @@ export function loadConfig(): AppConfig {
     hyperliquid: {
       apiUrl:
         process.env.HL_API_URL ||
-        (env === 'mainnet'
-          ? 'https://api.hyperliquid.xyz'
-          : 'https://api.hyperliquid-testnet.xyz'),
+        (env === 'mainnet' ? 'https://api.hyperliquid.xyz' : 'https://api.hyperliquid-testnet.xyz'),
       wsUrl:
         process.env.HL_WS_URL ||
         (env === 'mainnet'
@@ -92,7 +90,10 @@ export function applyDbOverrides(config: AppConfig, settingsRepo: SettingsReposi
   const merged = { ...config };
 
   if (dbSettings.debounce_count) {
-    merged.monitoring = { ...merged.monitoring, debounceCount: parseInt(dbSettings.debounce_count) };
+    merged.monitoring = {
+      ...merged.monitoring,
+      debounceCount: parseInt(dbSettings.debounce_count),
+    };
   }
   if (dbSettings.polling_interval_ms) {
     merged.monitoring = {
@@ -164,10 +165,7 @@ function loadDotenv(): void {
 
 /** Load env-specific .env.{testnet|mainnet} overrides */
 function loadEnvFile(env: string): void {
-  const candidates = [
-    resolve(monorepoRoot, `.env.${env}`),
-    resolve(process.cwd(), `.env.${env}`),
-  ];
+  const candidates = [resolve(monorepoRoot, `.env.${env}`), resolve(process.cwd(), `.env.${env}`)];
   const envPath = candidates.find(existsSync);
   if (envPath) parseEnvFile(envPath);
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EntryZoneDetector, type EntrySignal } from './entry-zone-detector.js';
 import type { PoolConfig } from '@rangeguard/common';
 

@@ -7,7 +7,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { active } = await request.json();
     poolsRepo.toggleProtection(id, active);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to toggle protection' }, { status: 500 });
   }
 }

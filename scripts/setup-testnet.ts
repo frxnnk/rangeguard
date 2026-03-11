@@ -114,7 +114,7 @@ const protectionWallet = walletsRepo.create({
   lowBalanceThreshold: '100',
 });
 
-const profitWallet = walletsRepo.create({
+walletsRepo.create({
   alias: generated[1].alias,
   address: generated[1].address,
   walletType: generated[1].type,
