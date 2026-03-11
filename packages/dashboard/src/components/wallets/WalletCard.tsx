@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { WalletPnlSparkline } from './WalletPnlSparkline';
 
 interface WalletCardProps {
   wallet: {
@@ -82,6 +83,8 @@ export function WalletCard({ wallet }: WalletCardProps) {
             Actualizado {new Date(wallet.lastBalanceCheck).toLocaleTimeString('es-AR')}
           </p>
         )}
+
+        <WalletPnlSparkline walletId={wallet.id} />
       </CardContent>
     </Card>
   );

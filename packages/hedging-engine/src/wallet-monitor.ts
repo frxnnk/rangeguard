@@ -1,6 +1,11 @@
-import { createLogger } from '@trading-bot/common';
-import type { WalletBalance, Wallet } from '@trading-bot/common';
-import type { WalletsRepository, HedgesRepository, PnlRepository } from '@trading-bot/db';
+import { createLogger } from '@rangeguard/common';
+import type { WalletBalance, Wallet } from '@rangeguard/common';
+import type {
+  WalletsRepository,
+  HedgesRepository,
+  PnlRepository,
+  RangeTradesRepository,
+} from '@rangeguard/db';
 import type { HyperliquidClient } from './hyperliquid-client.js';
 import type { PositionInfo } from './hyperliquid-client.js';
 
@@ -17,6 +22,7 @@ export class WalletMonitor {
   private walletsRepo: WalletsRepository;
   private hedgesRepo?: HedgesRepository;
   private pnlRepo?: PnlRepository;
+  private rangeTradesRepo?: RangeTradesRepository;
   private intervalMs: number;
   private timer?: ReturnType<typeof setInterval>;
   private onLowBalance?: (wallet: Wallet, balance: WalletBalance) => void;
@@ -31,6 +37,7 @@ export class WalletMonitor {
     hedgesRepo?: HedgesRepository,
     onLiquidation?: (event: LiquidationEvent) => void,
     pnlRepo?: PnlRepository,
+    rangeTradesRepo?: RangeTradesRepository,
   ) {
     this.hlClient = hlClient;
     this.walletsRepo = walletsRepo;
@@ -39,6 +46,7 @@ export class WalletMonitor {
     this.hedgesRepo = hedgesRepo;
     this.onLiquidation = onLiquidation;
     this.pnlRepo = pnlRepo;
+    this.rangeTradesRepo = rangeTradesRepo;
   }
 
   /** Start monitoring all wallets */
@@ -64,6 +72,15 @@ export class WalletMonitor {
   /** Check balances of all registered wallets */
   async checkAll(): Promise<void> {
     const wallets = this.walletsRepo.findAll();
+
+    // Determine which wallets have open positions (hedges or range trades)
+    const activeWalletIds = new Set<string>();
+    if (this.hedgesRepo) {
+      for (const h of this.hedgesRepo.findOpen()) activeWalletIds.add(h.walletId);
+    }
+    if (this.rangeTradesRepo) {
+      for (const t of this.rangeTradesRepo.findOpen()) activeWalletIds.add(t.walletId);
+    }
 
     for (const wallet of wallets) {
       if (!this.hlClient.hasWallet(wallet.id)) continue;
@@ -93,8 +110,8 @@ export class WalletMonitor {
           this.onLowBalance?.(wallet, balance);
         }
 
-        // Check liquidations + snapshot unrealized PnL (fetches positions once)
-        if (this.hedgesRepo) {
+        // Only check positions/liquidations for wallets with open hedges or trades
+        if (this.hedgesRepo && activeWalletIds.has(wallet.id)) {
           const openHedges = this.hedgesRepo.findOpenByWallet(wallet.id);
           if (openHedges.length > 0) {
             let positions: PositionInfo[] | undefined;

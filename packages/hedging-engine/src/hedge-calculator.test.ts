@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { PoolConfig } from '@trading-bot/common';
+import type { PoolConfig } from '@rangeguard/common';
 import { HedgeCalculator } from './hedge-calculator.js';
 
 function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
@@ -20,6 +20,9 @@ function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
     protectionDirection: 'below',
     protectionWalletId: 'wallet-1',
     profitWalletEnabled: false,
+    hedgeRatio: 1.0,
+    hedgeCooldownSeconds: 300,
+    debounceCount: 3,
     protectionActive: true,
     status: 'in-range',
     createdAt: Date.now(),
@@ -76,6 +79,29 @@ describe('HedgeCalculator', () => {
       const result = calc.calculate(config, 100, 'below');
       // 10000 / 100 = 100.0
       expect(result.size).toBe('100.00');
+    });
+  });
+
+  describe('hedge ratio', () => {
+    it('should apply hedgeRatio to size calculation', () => {
+      const config = makeConfig({ poolAmount: '10000', hedgeAsset: 'ETH', hedgeRatio: 0.5 });
+      const result = calc.calculate(config, 2000, 'below');
+      // 10000 * 0.5 / 2000 = 2.5
+      expect(result.size).toBe('2.5000');
+    });
+
+    it('should default to 1.0 when hedgeRatio is undefined', () => {
+      const config = makeConfig({ poolAmount: '10000', hedgeAsset: 'ETH' });
+      // hedgeRatio not set in makeConfig defaults, should behave as 1.0
+      const result = calc.calculate(config, 2000, 'below');
+      expect(result.size).toBe('5.0000');
+    });
+
+    it('should support hedgeRatio > 1.0', () => {
+      const config = makeConfig({ poolAmount: '10000', hedgeAsset: 'ETH', hedgeRatio: 1.5 });
+      const result = calc.calculate(config, 2000, 'below');
+      // 10000 * 1.5 / 2000 = 7.5
+      expect(result.size).toBe('7.5000');
     });
   });
 

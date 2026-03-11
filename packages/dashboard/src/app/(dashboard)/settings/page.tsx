@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -20,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Info, RotateCcw, Save, Terminal } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, RotateCcw, Save, Shield } from 'lucide-react';
 
 const DEFAULTS: Record<string, string> = {
   debounce_count: '3',
@@ -33,16 +32,13 @@ const DEFAULTS: Record<string, string> = {
   hl_environment: 'testnet',
 };
 
-const HL_URLS: Record<string, { api: string; ws: string }> = {
-  testnet: {
-    api: 'https://api.hyperliquid-testnet.xyz',
-    ws: 'wss://api.hyperliquid-testnet.xyz/ws',
-  },
-  mainnet: {
-    api: 'https://api.hyperliquid.xyz',
-    ws: 'wss://api.hyperliquid.xyz/ws',
-  },
-};
+const SECURITY_FEATURES = [
+  'Vault encriptado con AES-256-GCM + scrypt KDF',
+  'Claves cargadas en memoria, borradas al apagar el bot',
+  'Claves privadas nunca almacenadas en la base de datos',
+  'Una wallet aislada por pool (sin posiciones cruzadas)',
+  'Stop-loss de respaldo en cada cobertura abierta',
+];
 
 async function fetchSettings(): Promise<Record<string, string>> {
   const res = await fetch('/api/settings');
@@ -116,18 +112,6 @@ export default function SettingsPage() {
     setDirty(true);
   };
 
-  const handleEnvironmentToggle = (checked: boolean) => {
-    const env = checked ? 'mainnet' : 'testnet';
-    const urls = HL_URLS[env];
-    setForm((prev) => ({
-      ...prev,
-      hl_environment: env,
-      hl_api_url: urls.api,
-      hl_ws_url: urls.ws,
-    }));
-    setDirty(true);
-  };
-
   const handleSave = () => {
     mutation.mutate(form);
   };
@@ -159,7 +143,9 @@ export default function SettingsPage() {
         <Alert variant="destructive">
           <AlertTriangle className="size-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>Error al cargar configuración. ¿La base de datos es accesible?</AlertDescription>
+          <AlertDescription>
+            Error al cargar configuración. ¿La base de datos es accesible?
+          </AlertDescription>
         </Alert>
       </div>
     );
@@ -190,7 +176,8 @@ export default function SettingsPage() {
         <Info className="size-4" />
         <AlertTitle>Reinicio requerido</AlertTitle>
         <AlertDescription>
-          Reiniciá el bot después de cambiar la configuración para que los cambios tomen efecto.
+          Los cambios se aplican en el próximo reinicio del bot. Los ajustes del dashboard tienen
+          prioridad sobre las variables de entorno.
         </AlertDescription>
       </Alert>
 
@@ -198,8 +185,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="monitoring">Monitoreo</TabsTrigger>
           <TabsTrigger value="hyperliquid">Hyperliquid</TabsTrigger>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="vault">Vault</TabsTrigger>
+          <TabsTrigger value="security">Seguridad</TabsTrigger>
         </TabsList>
 
         <TabsContent value="monitoring">
@@ -207,7 +193,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Parámetros de Monitoreo</CardTitle>
               <CardDescription>
-                Configurá cómo el bot monitorea pools y wallets para detectar salidas de rango.
+                Configurá cómo el bot monitorea pools y wallets, y el nivel de detalle de los logs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -263,7 +249,9 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="wallet_check_interval_ms">Intervalo de Chequeo de Wallets (ms)</Label>
+                  <Label htmlFor="wallet_check_interval_ms">
+                    Intervalo de Chequeo de Wallets (ms)
+                  </Label>
                   <Input
                     id="wallet_check_interval_ms"
                     type="number"
@@ -278,82 +266,9 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="hyperliquid">
-          <Card>
-            <CardHeader>
-              <CardTitle>Conexión Hyperliquid</CardTitle>
-              <CardDescription>
-                Configurá el entorno y endpoints del DEX Hyperliquid.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                <div className="space-y-1">
-                  <Label>Entorno</Label>
-                  <p className="text-xs text-muted-foreground">
-                    {isMainnet
-                      ? 'Conectado a mainnet de Hyperliquid. Fondos reales en riesgo.'
-                      : 'Conectado a testnet de Hyperliquid. Seguro para pruebas.'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">Testnet</span>
-                  <Switch checked={isMainnet} onCheckedChange={handleEnvironmentToggle} />
-                  <span className="text-sm text-muted-foreground">Mainnet</span>
-                </div>
-              </div>
-
-              {isMainnet && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="size-4" />
-                  <AlertTitle>Advertencia Mainnet</AlertTitle>
-                  <AlertDescription>
-                    Estás apuntando a mainnet. Todos los trades usarán fondos reales. Procedé con
-                    precaución.
-                  </AlertDescription>
-                </Alert>
-              )}
 
               <Separator />
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="hl_api_url">API URL</Label>
-                  <Input
-                    id="hl_api_url"
-                    type="url"
-                    value={form.hl_api_url}
-                    onChange={(e) => updateField('hl_api_url', e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="hl_ws_url">WebSocket URL</Label>
-                  <Input
-                    id="hl_ws_url"
-                    type="url"
-                    value={form.hl_ws_url}
-                    onChange={(e) => updateField('hl_ws_url', e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>General</CardTitle>
-              <CardDescription>Logging y otros ajustes globales.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
               <div className="space-y-2 max-w-xs">
                 <Label htmlFor="log_level">Nivel de Log</Label>
                 <Select
@@ -378,41 +293,103 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="vault">
+        <TabsContent value="hyperliquid">
           <Card>
             <CardHeader>
-              <CardTitle>Vault y Billeteras</CardTitle>
+              <CardTitle>Conexión Hyperliquid</CardTitle>
               <CardDescription>
-                Las claves privadas se almacenan en un vault encriptado con AES-256-GCM.
+                Entorno y endpoints del DEX Hyperliquid.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-border p-4 space-y-1">
-                  <p className="text-sm text-muted-foreground">Billeteras Registradas</p>
-                  <p className="text-2xl font-bold text-foreground">{walletCount}</p>
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                <div className="space-y-1">
+                  <Label>Entorno</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {isMainnet
+                      ? 'Conectado a mainnet de Hyperliquid. Fondos reales en riesgo.'
+                      : 'Conectado a testnet de Hyperliquid. Seguro para pruebas.'}
+                  </p>
                 </div>
-                <div className="rounded-lg border border-border p-4 space-y-1">
-                  <p className="text-sm text-muted-foreground">Ruta del Vault</p>
-                  <p className="text-sm font-mono text-foreground">data/vault.enc</p>
+                <Badge variant={isMainnet ? 'destructive' : 'secondary'} className="text-sm">
+                  {isMainnet ? 'Mainnet' : 'Testnet'}
+                </Badge>
+              </div>
+
+              <Alert>
+                <Info className="size-4" />
+                <AlertTitle>Controlado por variable de entorno</AlertTitle>
+                <AlertDescription>
+                  El ambiente se controla con <code className="text-xs bg-muted px-1 py-0.5 rounded">RANGEGUARD_ENV</code>. Reiniciar el bot para cambiar de ambiente.
+                </AlertDescription>
+              </Alert>
+
+              {isMainnet && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="size-4" />
+                  <AlertTitle>Advertencia Mainnet</AlertTitle>
+                  <AlertDescription>
+                    Estás en mainnet. Todos los trades usan fondos reales.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hl_api_url">API URL</Label>
+                  <Input
+                    id="hl_api_url"
+                    type="url"
+                    value={form.hl_api_url}
+                    readOnly
+                    className="font-mono text-sm bg-muted"
+                  />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hl_ws_url">WebSocket URL</Label>
+                  <Input
+                    id="hl_ws_url"
+                    type="url"
+                    value={form.hl_ws_url}
+                    readOnly
+                    className="font-mono text-sm bg-muted"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="size-5 text-muted-foreground" />
+                <CardTitle>Seguridad</CardTitle>
+              </div>
+              <CardDescription>
+                Modelo de seguridad del bot para la protección de claves y fondos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="rounded-lg border border-border p-4 space-y-1">
+                <p className="text-sm text-muted-foreground">Billeteras Registradas</p>
+                <p className="text-2xl font-bold text-foreground">{walletCount}</p>
               </div>
 
               <Separator />
 
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Usá la herramienta CLI para agregar, listar o rotar claves privadas en el vault:
-                </p>
-                <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-3">
-                  <Terminal className="size-4 text-muted-foreground shrink-0" />
-                  <code className="text-sm font-mono text-foreground">pnpm setup-keys</code>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Después de agregar una wallet al vault, registrala en la base de datos desde la
-                  página de Billeteras para poder asignarla a un pool.
-                </p>
-              </div>
+              <ul className="space-y-3">
+                {SECURITY_FEATURES.map((feature) => (
+                  <li key={feature} className="flex items-start gap-3">
+                    <CheckCircle2 className="size-4 mt-0.5 shrink-0 text-emerald-500" />
+                    <span className="text-sm text-foreground">{feature}</span>
+                  </li>
+                ))}
+              </ul>
             </CardContent>
           </Card>
         </TabsContent>

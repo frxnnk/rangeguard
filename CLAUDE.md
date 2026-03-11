@@ -1,4 +1,4 @@
-# CLAUDE.md - Trading Bot CGR
+# CLAUDE.md - RangeGuard
 
 ## What is this project?
 
@@ -13,8 +13,8 @@ pnpm dev:bot                # Start bot (tsx, no watch)
 pnpm dev:dashboard          # Start Next.js dashboard on :3000
 
 # Quality checks (run all before committing)
-pnpm test                   # 116 tests via Vitest
-pnpm typecheck              # tsc --noEmit across 7 packages
+pnpm test                   # 125 tests via Vitest
+pnpm typecheck              # tsc --noEmit across 8 packages
 pnpm lint                   # ESLint (0 errors, ~28 warnings expected)
 pnpm format:check           # Prettier check
 
@@ -22,6 +22,10 @@ pnpm format:check           # Prettier check
 pnpm testnet-seed           # Seed DB with dummy data (quick start)
 pnpm setup-testnet          # Generate real wallets + vault + DB seed
 pnpm setup-keys             # Interactive CLI for vault key management
+
+# Backtesting
+pnpm backtest --pair ETH/USDC --range 1800-2200 --period 6m    # Single backtest
+pnpm backtest --pair ETH/USDC --range 1800-2200 --period 3m --sweep  # Parameter sweep
 
 # Build
 pnpm build                  # Build all packages
@@ -37,6 +41,7 @@ packages/db              → SQLite (better-sqlite3, WAL), 6 tables, repository 
 packages/security        → AES-256-GCM vault for N wallet private keys, scrypt KDF
 packages/pool-monitor    → viem multi-chain clients, Swap event WS + slot0 polling, range detector
 packages/hedging-engine  → @nktkas/hyperliquid SDK, hedge calculator, order executor, wallet monitor, range trading engine
+packages/backtest        → Data loader (CSV + Binance API), orchestrator, analyzer (PnL/Sharpe/drawdown), CLI
 packages/dashboard       → Next.js 15 App Router, TanStack Query, Recharts, shadcn/ui (dark theme)
 apps/bot                 → Bootstrap, event bus, config loader, graceful shutdown
 ```
@@ -73,7 +78,9 @@ apps/bot                 → Bootstrap, event bus, config loader, graceful shutd
 - One HL wallet per pool (perpetuals cancel opposing positions in same wallet)
 - One global profit wallet shared across pools
 - Manual pool config via dashboard (no on-chain LP position reading)
-- Range detector: debounce 3 consecutive updates + cooldown post-close
+- Range detector: debounce 3 consecutive updates + per-pool cooldown post-close
+- `hedgeRatio`: configurable 0.1-2.0 multiplier on hedge size (default 1.0)
+- `hedgeCooldownSeconds`: per-pool cooldown after range return (default 300s)
 
 ## Database
 
@@ -101,11 +108,11 @@ npx shadcn@latest add <component-name>
 Vitest workspace config at root. Per-package `vitest.config.ts`.
 
 - Test DB: in-memory SQLite via `createTestDb()` in `packages/db/src/test-utils.ts`
-- 116 tests: db (64), pool-monitor (15), hedging-engine (37)
+- 125 tests: db (64), pool-monitor (21), hedging-engine (40)
 
 ## Security
 
-Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
+Vault file: `~/.rangeguard/vault.enc` (or `VAULT_PATH` env var)
 
 - Encryption: AES-256-GCM
 - KDF: scrypt (N=2^17, r=8, p=1, maxmem=256MB)
@@ -114,7 +121,7 @@ Vault file: `~/.trading-bot-cgr/vault.enc` (or `VAULT_PATH` env var)
 ## Current Status
 
 - V1 complete + V2 features (R10 range trading, R11 per-pool costs, R12 Spanish UI)
-- 116 tests passing, 0 typecheck errors
+- 125 tests passing, 0 typecheck errors (8 packages)
 - Dashboard fully migrated to shadcn/ui with semantic tokens, all in Spanish
 - Docker + CI/CD configured
 - **E2E tested on HL testnet** (2026-03-10): full open→close hedge cycle verified

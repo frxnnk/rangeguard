@@ -185,8 +185,8 @@ async function runSimulation(scenario: keyof typeof PRICE_SEQUENCES, useLive: bo
       process.exit(1);
     }
 
-    const vaultPath =
-      process.env.VAULT_PATH ?? resolve(process.env.HOME ?? '~', '.trading-bot-cgr', 'vault.enc');
+    const { defaultVaultPath, resolveEnv } = await import('@rangeguard/common');
+    const vaultPath = process.env.VAULT_PATH ?? defaultVaultPath(resolveEnv());
     const vault = new Vault(vaultPassword, vaultPath);
     const keyManager = new KeyManager(vault);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -7,12 +8,13 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { NetworkBadge } from '@/components/common/NetworkBadge';
 import { RangeIndicator } from '@/components/pools/RangeIndicator';
+import { PoolEditSheet } from '@/components/pools/PoolEditSheet';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { HedgeCard } from '@/components/hedges/HedgeCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShieldOff, DollarSign, TrendingUp, Activity, Trash2 } from 'lucide-react';
+import { ShieldOff, DollarSign, TrendingUp, Activity, Trash2, Pencil } from 'lucide-react';
 
 const FEE_LABELS: Record<number, string> = {
   100: '0.01%',
@@ -23,6 +25,7 @@ const FEE_LABELS: Record<number, string> = {
 
 export default function PoolDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: pool, isLoading: poolLoading } = useQuery({
     queryKey: ['pool', id],
@@ -103,8 +106,9 @@ export default function PoolDetailPage() {
           </div>
           {pool.name && <p className="text-sm text-muted-foreground">{pool.name}</p>}
         </div>
-        <Button asChild variant="secondary">
-          <Link href={`/pools/${id}/edit`}>Editar Pool</Link>
+        <Button variant="secondary" onClick={() => setEditOpen(true)}>
+          <Pencil className="size-3.5 mr-1.5" />
+          Editar Pool
         </Button>
       </div>
 
@@ -339,6 +343,8 @@ export default function PoolDetailPage() {
           </div>
         )}
       </div>
+
+      <PoolEditSheet poolId={id} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }

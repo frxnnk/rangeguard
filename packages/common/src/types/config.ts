@@ -1,4 +1,5 @@
 export interface AppConfig {
+  env: 'testnet' | 'mainnet';
   vault: {
     path: string;
     password?: string;

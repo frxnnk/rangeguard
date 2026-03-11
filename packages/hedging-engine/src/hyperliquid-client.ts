@@ -1,6 +1,6 @@
 import * as hl from '@nktkas/hyperliquid';
 import { privateKeyToAccount } from 'viem/accounts';
-import { createLogger, withRetry, HL_SLIPPAGE_BPS } from '@trading-bot/common';
+import { createLogger, withRetry, HL_SLIPPAGE_BPS } from '@rangeguard/common';
 
 const logger = createLogger('hl-client');
 
@@ -41,6 +41,7 @@ export class HyperliquidClient {
   private apiUrl: string;
   private isTestnet: boolean;
   private assetIndexCache: Map<string, number> = new Map(); // coin name -> asset index
+  private leverageCache: Map<string, number> = new Map(); // "walletId:assetIndex" -> leverage
 
   constructor(apiUrl: string) {
     this.apiUrl = apiUrl;
@@ -121,19 +122,22 @@ export class HyperliquidClient {
       // Resolve coin name to asset index
       const assetIndex = await this.resolveAssetIndex(client.transport, asset);
 
-      // Set leverage first
-      await withRetry(
-        async () => {
-          await client.walletClient.updateLeverage({
-            asset: assetIndex,
-            leverage,
-            isCross: true,
-          });
-        },
-        { maxRetries: 2, baseDelayMs: 500 },
-      );
-
-      logger.info({ walletId, asset, leverage }, 'Leverage set');
+      // Set leverage (skip if already set to same value)
+      const levKey = `${walletId}:${assetIndex}`;
+      if (this.leverageCache.get(levKey) !== leverage) {
+        await withRetry(
+          async () => {
+            await client.walletClient.updateLeverage({
+              asset: assetIndex,
+              leverage,
+              isCross: true,
+            });
+          },
+          { maxRetries: 2, baseDelayMs: 500 },
+        );
+        this.leverageCache.set(levKey, leverage);
+        logger.info({ walletId, asset, leverage }, 'Leverage set');
+      }
 
       // Place IOC order
       const result = await withRetry(
@@ -455,6 +459,39 @@ export class HyperliquidClient {
   /** Check if a wallet client exists */
   hasWallet(walletId: string): boolean {
     return this.clients.has(walletId);
+  }
+
+  /** Pre-load all asset indices from HL meta (avoids lazy resolve on first hedge) */
+  async preloadAssetMeta(): Promise<void> {
+    const firstClient = this.clients.values().next().value;
+    if (!firstClient) return;
+    const publicClient = new hl.PublicClient({ transport: firstClient.transport });
+    const meta = await publicClient.meta();
+    for (let i = 0; i < meta.universe.length; i++) {
+      this.assetIndexCache.set(meta.universe[i].name, i);
+    }
+    logger.info({ assetCount: meta.universe.length }, 'Asset index cache preloaded');
+  }
+
+  /** Pre-set leverage for a wallet+asset so it's not on the hot path */
+  async presetLeverage(walletId: string, asset: string, leverage: number): Promise<void> {
+    const client = this.getWalletClient(walletId);
+    const assetIndex = await this.resolveAssetIndex(client.transport, asset);
+    const key = `${walletId}:${assetIndex}`;
+    if (this.leverageCache.get(key) === leverage) return;
+
+    await withRetry(
+      async () => {
+        await client.walletClient.updateLeverage({
+          asset: assetIndex,
+          leverage,
+          isCross: true,
+        });
+      },
+      { maxRetries: 2, baseDelayMs: 500 },
+    );
+    this.leverageCache.set(key, leverage);
+    logger.info({ walletId, asset, leverage }, 'Leverage pre-set');
   }
 }
 

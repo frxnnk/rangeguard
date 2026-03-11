@@ -1,0 +1,27 @@
+{
+  "name": "@rangeguard/backtest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "backtest": "./src/cli.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "backtest": "node --no-warnings --import tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@rangeguard/common": "workspace:*",
+    "@rangeguard/db": "workspace:*",
+    "@rangeguard/pool-monitor": "workspace:*",
+    "@rangeguard/hedging-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
+    "tsx": "^4.19.0"
+  }
+}

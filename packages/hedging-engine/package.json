@@ -1,5 +1,5 @@
 {
-  "name": "@trading-bot/hedging-engine",
+  "name": "@rangeguard/hedging-engine",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@trading-bot/common": "workspace:*",
-    "@trading-bot/db": "workspace:*",
-    "@trading-bot/security": "workspace:*",
+    "@rangeguard/common": "workspace:*",
+    "@rangeguard/db": "workspace:*",
+    "@rangeguard/security": "workspace:*",
     "@nktkas/hyperliquid": "^0.16.0",
     "viem": "^2.23.0"
   },

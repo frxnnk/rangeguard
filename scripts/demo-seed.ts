@@ -3,10 +3,8 @@
  * Creates pools, wallets, closed hedges with PnL/fees, an open hedge
  * with unrealized PnL snapshot, and price history for charts.
  */
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { resolve } from 'path';
+import { resolveEnv, defaultDbPath } from '../packages/common/src/utils/env.js';
 import {
   getDatabase,
   closeDatabase,
@@ -17,8 +15,9 @@ import { WalletsRepository } from '../packages/db/src/repositories/wallets.repo.
 import { HedgesRepository } from '../packages/db/src/repositories/hedges.repo.js';
 import { PnlRepository } from '../packages/db/src/repositories/pnl.repo.js';
 
-const monorepoRoot = resolve(__dirname, '..');
-const dbPath = process.env.DB_PATH || resolve(monorepoRoot, 'data', 'bot.db');
+const monorepoRoot = resolve(import.meta.dirname!, '..');
+const env = resolveEnv();
+const dbPath = process.env.DB_PATH || defaultDbPath(monorepoRoot, env);
 
 const db = getDatabase(dbPath);
 runMigrations(db);
@@ -29,6 +28,8 @@ db.exec(`
   DELETE FROM pnl_snapshots;
   DELETE FROM price_cache;
   DELETE FROM trade_log;
+  DELETE FROM bot_logs;
+  DELETE FROM range_trades;
   DELETE FROM hedge_trades;
   DELETE FROM stop_loss_orders;
   DELETE FROM pool_configs;

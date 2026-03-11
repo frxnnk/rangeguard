@@ -93,7 +93,7 @@ Scope: 8 pasos ordenados por prioridad. Cada paso es independiente y testeable.
 - [x] `init: true` en docker-compose
 - [x] Health checks para bot y dashboard
 - [x] Resource limits (512M)
-- [x] Vault volume path → `/home/botuser/.trading-bot-cgr`
+- [x] Vault volume path → `/home/botuser/.rangeguard`
 
 ---
 

@@ -19,6 +19,9 @@ export function getDatabase(dbPath?: string): Database.Database {
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');
   db.pragma('foreign_keys = ON');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('cache_size = 10000');
+  db.pragma('temp_store = MEMORY');
 
   return db;
 }

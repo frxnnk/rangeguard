@@ -14,7 +14,7 @@ El cliente valida el enfoque actual ("práctico y visual") y pide 3 nuevas funci
 **Respuesta**: Ya implementado en R6:
 - **AES-256-GCM** (cifrado simétrico de grado militar, mismo estándar que usan bancos)
 - **scrypt KDF** (N=2¹⁷, r=8, p=1) para derivar la clave de cifrado a partir de un password
-- Las claves privadas **nunca** se guardan en la base de datos — solo en un archivo vault cifrado (`~/.trading-bot-cgr/vault.enc`)
+- Las claves privadas **nunca** se guardan en la base de datos — solo en un archivo vault cifrado (`~/.rangeguard/vault.enc`)
 - Se cargan a memoria al iniciar el bot y se limpian al apagar
 - Cada wallet tiene su propia entrada en el vault
 

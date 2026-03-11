@@ -1,6 +1,6 @@
-import { createLogger } from '@trading-bot/common';
-import type { HedgeTrade } from '@trading-bot/common';
-import type { HedgesRepository } from '@trading-bot/db';
+import { createLogger } from '@rangeguard/common';
+import type { HedgeTrade } from '@rangeguard/common';
+import type { HedgesRepository } from '@rangeguard/db';
 
 const logger = createLogger('position-tracker');
 

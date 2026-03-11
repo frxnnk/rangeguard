@@ -1,5 +1,5 @@
-import { createLogger } from '@trading-bot/common';
-import type { PriceUpdate } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
+import type { PriceUpdate } from '@rangeguard/common';
 
 const logger = createLogger('price-feed');
 

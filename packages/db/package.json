@@ -1,17 +1,21 @@
 {
-  "name": "@trading-bot/db",
+  "name": "@rangeguard/db",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-utils": "./src/test-utils.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "migrate": "tsx src/migrations/run.ts"
   },
   "dependencies": {
-    "@trading-bot/common": "workspace:*",
+    "@rangeguard/common": "workspace:*",
     "better-sqlite3": "^11.7.0",
     "uuid": "^11.1.0"
   },

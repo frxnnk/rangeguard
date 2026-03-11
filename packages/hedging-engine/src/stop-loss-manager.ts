@@ -1,5 +1,5 @@
-import { createLogger } from '@trading-bot/common';
-import type { StopLossRepository } from '@trading-bot/db';
+import { createLogger } from '@rangeguard/common';
+import type { StopLossRepository } from '@rangeguard/db';
 import type { HyperliquidClient } from './hyperliquid-client.js';
 
 const logger = createLogger('stop-loss');

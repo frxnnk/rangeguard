@@ -32,8 +32,8 @@ Guia paso a paso para probar el ciclo completo de hedging en Hyperliquid testnet
 ## Paso 1: Instalar y configurar
 
 ```bash
-git clone https://github.com/frxnnk/trading-bot-cgr.git
-cd trading-bot-cgr
+git clone https://github.com/frxnnk/rangeguard.git
+cd rangeguard
 pnpm install
 ```
 
@@ -68,7 +68,7 @@ pnpm setup-testnet
 Este script:
 
 1. Genera 2 pares de claves secp256k1 (protection + profit)
-2. Encripta las private keys en el vault (`~/.trading-bot-cgr/vault.enc`)
+2. Encripta las private keys en el vault (`~/.rangeguard/vault.enc`)
 3. Crea las wallets en la DB con sus addresses reales
 4. Crea un pool ETH/USDC Arbitrum de prueba
 

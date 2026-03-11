@@ -1,6 +1,6 @@
-import { createLogger } from '@trading-bot/common';
-import type { RangeTrade } from '@trading-bot/common';
-import type { RangeTradesRepository } from '@trading-bot/db';
+import { createLogger } from '@rangeguard/common';
+import type { RangeTrade } from '@rangeguard/common';
+import type { RangeTradesRepository } from '@rangeguard/db';
 
 const logger = createLogger('trailing-stop');
 

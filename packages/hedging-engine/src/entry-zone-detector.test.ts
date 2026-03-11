@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EntryZoneDetector, type EntrySignal } from './entry-zone-detector.js';
-import type { PoolConfig } from '@trading-bot/common';
+import type { PoolConfig } from '@rangeguard/common';
 
 function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
   return {
@@ -20,6 +20,9 @@ function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
     protectionDirection: 'below',
     protectionWalletId: 'wallet-1',
     profitWalletEnabled: false,
+    hedgeRatio: 1.0,
+    hedgeCooldownSeconds: 300,
+    debounceCount: 3,
     protectionActive: true,
     status: 'in-range',
     createdAt: Date.now(),

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { v4 } from 'uuid';
-import type { Wallet, CreateWallet, WalletRole, WalletBalance } from '@trading-bot/common';
+import type { Wallet, CreateWallet, WalletRole, WalletBalance } from '@rangeguard/common';
 
 interface WalletRow {
   id: string;

@@ -1,5 +1,5 @@
-import { createLogger } from '@trading-bot/common';
-import type { PoolConfig, HedgeSide } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
+import type { PoolConfig, HedgeSide } from '@rangeguard/common';
 
 const logger = createLogger('entry-zone-detector');
 

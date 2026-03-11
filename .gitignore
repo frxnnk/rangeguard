@@ -7,6 +7,8 @@ out/
 .env
 .env.local
 .env.production
+.env.testnet
+.env.mainnet
 *.enc
 vault.enc
 
@@ -28,7 +30,7 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+/logs/
 
 # Coverage
 coverage/

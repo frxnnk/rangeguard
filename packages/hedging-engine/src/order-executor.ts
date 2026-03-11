@@ -1,9 +1,9 @@
-import { createLogger } from '@trading-bot/common';
-import type { PoolConfig } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
+import type { PoolConfig } from '@rangeguard/common';
 import type { HyperliquidClient } from './hyperliquid-client.js';
 import { type OrderResult } from './hyperliquid-client.js';
 import type { HedgeParams } from './hedge-calculator.js';
-import type { TradeLogRepository } from '@trading-bot/db';
+import type { TradeLogRepository } from '@rangeguard/db';
 
 const logger = createLogger('order-executor');
 
@@ -30,7 +30,7 @@ export class OrderExecutor {
     this.tradeLog = tradeLog;
   }
 
-  /** Execute hedge on protection wallet (and optionally profit wallet) */
+  /** Execute hedge on protection wallet (and optionally profit wallet in parallel) */
   async openHedge(
     config: PoolConfig,
     params: HedgeParams,
@@ -38,7 +38,6 @@ export class OrderExecutor {
   ): Promise<ExecutionResult> {
     const isBuy = params.side === 'long';
 
-    // 1. Execute on protection wallet
     logger.info(
       {
         configId: config.id,
@@ -51,7 +50,8 @@ export class OrderExecutor {
       'Opening protection hedge',
     );
 
-    const protectionOrder = await this.hlClient.placeMarketOrder(
+    // Build promises
+    const protectionPromise = this.hlClient.placeMarketOrder(
       config.protectionWalletId,
       params.asset,
       isBuy,
@@ -59,70 +59,110 @@ export class OrderExecutor {
       params.currentPrice,
       params.leverage,
     );
+
+    const hasProfitWallet = config.profitWalletEnabled && profitWalletId;
+    if (hasProfitWallet) {
+      logger.info(
+        { configId: config.id, wallet: profitWalletId, type: 'profit' },
+        'Mirroring hedge on profit wallet',
+      );
+    }
+
+    const profitPromise = hasProfitWallet
+      ? this.hlClient.placeMarketOrder(
+          profitWalletId,
+          params.asset,
+          isBuy,
+          params.size,
+          params.currentPrice,
+          params.leverage,
+        )
+      : undefined;
+
+    // Execute in parallel
+    const [protectionResult, profitResult] = await Promise.allSettled([
+      protectionPromise,
+      profitPromise ?? Promise.resolve(undefined),
+    ]);
+
+    // Extract protection result
+    const protectionOrder: OrderResult =
+      protectionResult.status === 'fulfilled'
+        ? protectionResult.value
+        : { success: false, error: (protectionResult.reason as Error).message, latencyMs: 0 };
     protectionOrder.estimatedFees = estimateFee(
       protectionOrder.filledSize,
       protectionOrder.avgPrice,
     );
-
     this.logTrade(config.protectionWalletId, 'open_hedge_protection', protectionOrder);
 
-    // 2. If profit wallet enabled and exists, mirror the trade
+    // Extract profit result
     let profitOrder: OrderResult | undefined;
-    if (config.profitWalletEnabled && profitWalletId) {
-      logger.info(
-        {
-          configId: config.id,
-          wallet: profitWalletId,
-          type: 'profit',
-        },
-        'Mirroring hedge on profit wallet',
-      );
-
-      profitOrder = await this.hlClient.placeMarketOrder(
-        profitWalletId,
-        params.asset,
-        isBuy,
-        params.size,
-        params.currentPrice,
-        params.leverage,
-      );
+    if (hasProfitWallet && profitResult.status === 'fulfilled' && profitResult.value) {
+      profitOrder = profitResult.value;
       profitOrder.estimatedFees = estimateFee(profitOrder.filledSize, profitOrder.avgPrice);
-
-      this.logTrade(profitWalletId, 'open_hedge_profit', profitOrder);
+      this.logTrade(profitWalletId!, 'open_hedge_profit', profitOrder);
+    } else if (hasProfitWallet && profitResult.status === 'rejected') {
+      const errMsg = (profitResult.reason as Error).message;
+      logger.error({ configId: config.id, error: errMsg }, 'Profit wallet order failed');
+      this.logTrade(profitWalletId!, 'open_hedge_profit', {
+        success: false,
+        error: errMsg,
+        latencyMs: 0,
+      });
     }
 
     return { protectionOrder, profitOrder };
   }
 
-  /** Close hedge positions */
+  /** Close hedge positions (protection + profit in parallel) */
   async closeHedge(
     config: PoolConfig,
     asset: string,
     currentPrice: number,
     profitWalletId?: string,
   ): Promise<ExecutionResult> {
-    logger.info({ configId: config.id, asset }, 'Closing protection hedge');
+    logger.info({ configId: config.id, asset }, 'Closing hedge positions');
 
-    const protectionOrder = await this.hlClient.closePosition(
+    const protectionPromise = this.hlClient.closePosition(
       config.protectionWalletId,
       asset,
       currentPrice,
     );
+
+    const hasProfitWallet = config.profitWalletEnabled && profitWalletId;
+    const profitPromise = hasProfitWallet
+      ? this.hlClient.closePosition(profitWalletId, asset, currentPrice)
+      : undefined;
+
+    const [protectionResult, profitResult] = await Promise.allSettled([
+      protectionPromise,
+      profitPromise ?? Promise.resolve(undefined),
+    ]);
+
+    const protectionOrder: OrderResult =
+      protectionResult.status === 'fulfilled'
+        ? protectionResult.value
+        : { success: false, error: (protectionResult.reason as Error).message, latencyMs: 0 };
     protectionOrder.estimatedFees = estimateFee(
       protectionOrder.filledSize,
       protectionOrder.avgPrice,
     );
-
     this.logTrade(config.protectionWalletId, 'close_hedge_protection', protectionOrder);
 
     let profitOrder: OrderResult | undefined;
-    if (config.profitWalletEnabled && profitWalletId) {
-      logger.info({ configId: config.id, wallet: profitWalletId }, 'Closing profit hedge');
-
-      profitOrder = await this.hlClient.closePosition(profitWalletId, asset, currentPrice);
+    if (hasProfitWallet && profitResult.status === 'fulfilled' && profitResult.value) {
+      profitOrder = profitResult.value;
       profitOrder.estimatedFees = estimateFee(profitOrder.filledSize, profitOrder.avgPrice);
-
-      this.logTrade(profitWalletId, 'close_hedge_profit', profitOrder);
+      this.logTrade(profitWalletId!, 'close_hedge_profit', profitOrder);
+    } else if (hasProfitWallet && profitResult.status === 'rejected') {
+      const errMsg = (profitResult.reason as Error).message;
+      logger.error({ configId: config.id, error: errMsg }, 'Profit wallet close failed');
+      this.logTrade(profitWalletId!, 'close_hedge_profit', {
+        success: false,
+        error: errMsg,
+        latencyMs: 0,
+      });
     }
 
     return { protectionOrder, profitOrder };

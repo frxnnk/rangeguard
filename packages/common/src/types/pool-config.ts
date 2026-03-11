@@ -25,6 +25,9 @@ export interface PoolConfig {
   protectionDirection: ProtectionDirection;
   protectionWalletId: string;
   profitWalletEnabled: boolean;
+  hedgeRatio: number; // 0.1–2.0, multiplier on hedge size (default 1.0)
+  hedgeCooldownSeconds: number; // per-pool cooldown after range return (default 300)
+  debounceCount: number; // per-pool debounce ticks for range exit confirmation (default 3)
   protectionActive: boolean;
   status: PoolStatus;
   currentPrice?: string;
@@ -58,6 +61,9 @@ export interface CreatePoolConfig {
   protectionDirection: ProtectionDirection;
   protectionWalletId: string;
   profitWalletEnabled: boolean;
+  hedgeRatio?: number; // default 1.0
+  hedgeCooldownSeconds?: number; // default 300
+  debounceCount?: number; // default 3
   protectionActive: boolean;
 
   // Range trading config (R10) — all optional, defaults applied in DB

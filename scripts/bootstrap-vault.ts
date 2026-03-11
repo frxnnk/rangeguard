@@ -17,8 +17,8 @@
  *   4. Creates wallet records in the DB (if they don't exist)
  */
 import { resolve } from 'path';
-import { homedir } from 'os';
 import { privateKeyToAccount } from 'viem/accounts';
+import { resolveEnv, defaultDbPath, defaultVaultPath } from '../packages/common/src/utils/env.js';
 import { Vault } from '../packages/security/src/vault.js';
 import { getDatabase, closeDatabase } from '../packages/db/src/connection.js';
 import { runMigrations } from '../packages/db/src/migrations/001_initial.js';
@@ -43,9 +43,9 @@ if (!vaultPassword) {
 }
 
 const monorepoRoot = resolve(import.meta.dirname!, '..');
-const dbPath = process.env.DB_PATH || resolve(monorepoRoot, 'data', 'bot.db');
-const vaultPath =
-  process.env.VAULT_PATH || resolve(homedir(), '.trading-bot-cgr', 'vault.enc');
+const env = resolveEnv();
+const dbPath = process.env.DB_PATH || defaultDbPath(monorepoRoot, env);
+const vaultPath = process.env.VAULT_PATH || defaultVaultPath(env);
 
 // --- Parse WALLET_KEYS ---
 console.log('Bootstrapping vault from WALLET_KEYS...');

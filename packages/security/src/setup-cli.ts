@@ -3,10 +3,10 @@ import { Vault } from './vault.js';
 import { homedir } from 'os';
 import { join } from 'path';
 
-const DEFAULT_VAULT_PATH = join(homedir(), '.trading-bot-cgr', 'vault.enc');
+const DEFAULT_VAULT_PATH = join(homedir(), '.rangeguard', 'vault.enc');
 
 async function main() {
-  console.log('\n=== Trading Bot Key Manager ===\n');
+  console.log('\n=== RangeGuard Key Manager ===\n');
 
   const vaultPath = await input({
     message: 'Vault path:',

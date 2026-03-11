@@ -1,5 +1,5 @@
 {
-  "name": "@trading-bot/bot",
+  "name": "@rangeguard/bot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@trading-bot/common": "workspace:*",
-    "@trading-bot/db": "workspace:*",
-    "@trading-bot/security": "workspace:*",
-    "@trading-bot/pool-monitor": "workspace:*",
-    "@trading-bot/hedging-engine": "workspace:*"
+    "@rangeguard/common": "workspace:*",
+    "@rangeguard/db": "workspace:*",
+    "@rangeguard/security": "workspace:*",
+    "@rangeguard/pool-monitor": "workspace:*",
+    "@rangeguard/hedging-engine": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

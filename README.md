@@ -1,6 +1,6 @@
-# Trading Bot CGR
+# RangeGuard
 
-[![CI](https://github.com/frxnnk/trading-bot-cgr/actions/workflows/ci.yml/badge.svg)](https://github.com/frxnnk/trading-bot-cgr/actions/workflows/ci.yml)
+[![CI](https://github.com/frxnnk/rangeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/frxnnk/rangeguard/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-22+-green)
 ![License](https://img.shields.io/badge/License-Proprietary-red)
@@ -18,8 +18,8 @@ Bot de cobertura automatizada contra **Impermanent Loss** en pools de liquidez c
 
 ```bash
 # 1. Clonar e instalar
-git clone https://github.com/frxnnk/trading-bot-cgr.git
-cd trading-bot-cgr
+git clone https://github.com/frxnnk/rangeguard.git
+cd rangeguard
 pnpm install
 
 # 2. Seedear datos de prueba y abrir el dashboard
@@ -208,7 +208,7 @@ HedgingEngine.onRangeReturn()
 ## Estructura del monorepo
 
 ```
-trading-bot-cgr/
+rangeguard/
 ├── apps/
 │   └── bot/                          # Proceso principal del bot
 │       └── src/
@@ -419,7 +419,7 @@ Ejemplo:
 - **Protection wallet**: Una por pool. Ejecuta el hedge principal.
 - **Profit wallet** (opcional): Una global compartida. Mirror trade para separar ganancias.
 
-Las private keys se guardan en un vault encriptado con AES-256-GCM + scrypt KDF. El archivo vault se guarda fuera del repo (`~/.trading-bot-cgr/vault.enc` por default). **Nunca se almacenan private keys en la DB ni en archivos `.env`.**
+Las private keys se guardan en un vault encriptado con AES-256-GCM + scrypt KDF. El archivo vault se guarda fuera del repo (`~/.rangeguard/vault.enc` por default). **Nunca se almacenan private keys en la DB ni en archivos `.env`.**
 
 ---
 
@@ -432,8 +432,8 @@ Hay 3 niveles de setup, desde "solo ver la UI" hasta "hedging real en testnet":
 Ver la UI, crear pools manualmente, sin datos en vivo. No necesita nada externo.
 
 ```bash
-git clone https://github.com/frxnnk/trading-bot-cgr.git
-cd trading-bot-cgr
+git clone https://github.com/frxnnk/rangeguard.git
+cd rangeguard
 pnpm install
 pnpm testnet-seed      # Crea DB con datos de prueba (wallets con addresses dummy)
 pnpm dev:dashboard     # http://localhost:3000
@@ -496,7 +496,7 @@ pnpm setup-testnet
 El script:
 
 - Genera 2 wallets secp256k1 reales (`pool-eth-arb` + `profit-global`)
-- Encripta las private keys en `~/.trading-bot-cgr/vault.enc`
+- Encripta las private keys en `~/.rangeguard/vault.enc`
 - Registra las wallets en la DB con sus direcciones reales
 - Crea un pool ETH/USDC Arbitrum de prueba
 - **Muestra las private keys en consola** — copiarlas para importar en MetaMask
@@ -550,7 +550,7 @@ cp .env.example .env
 | Variable                   | Default                                | Requerida | Descripcion                                                   |
 | -------------------------- | -------------------------------------- | --------- | ------------------------------------------------------------- |
 | `VAULT_PASSWORD`           | -                                      | Nivel 3   | Password para encriptar/desencriptar el vault de private keys |
-| `VAULT_PATH`               | `~/.trading-bot-cgr/vault.enc`         | No        | Ruta al archivo vault                                         |
+| `VAULT_PATH`               | `~/.rangeguard/vault.enc`         | No        | Ruta al archivo vault                                         |
 | `DB_PATH`                  | `./data/bot.db`                        | No        | Ruta a la base de datos SQLite                                |
 | `RPC_ARBITRUM`             | -                                      | Nivel 2+  | URL HTTP del nodo RPC de Arbitrum                             |
 | `WS_ARBITRUM`              | -                                      | No        | URL WebSocket del nodo RPC de Arbitrum (mejora reactividad)   |
@@ -575,7 +575,7 @@ Las private keys **nunca** se almacenan en `.env`, en la DB, ni en texto plano. 
 
 1. `pnpm setup-keys` o `pnpm setup-testnet` → pide master password
 2. Las keys se encriptan con AES-256-GCM (scrypt KDF, N=2^17)
-3. Se guardan en `~/.trading-bot-cgr/vault.enc` (fuera del repo)
+3. Se guardan en `~/.rangeguard/vault.enc` (fuera del repo)
 4. Al arrancar, el bot usa `VAULT_PASSWORD` para desencriptar y cargar en memoria
 5. Al apagar, las keys se borran de memoria
 

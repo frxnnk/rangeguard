@@ -45,7 +45,7 @@ export default function LoginPage() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center mb-6">
             <Shield className="size-8 text-muted-foreground mb-2" />
-            <h1 className="text-lg font-bold text-foreground">Trading Bot</h1>
+            <h1 className="text-lg font-bold text-foreground">RangeGuard</h1>
             <p className="text-xs text-muted-foreground">Ingresá la API key para continuar</p>
           </div>
 

@@ -17,7 +17,7 @@ Railway corre el bot y el dashboard en un solo servicio usando el target `combin
 ## 1. Crear proyecto en Railway
 
 ```bash
-cd trading-bot-cgr
+cd rangeguard
 railway login
 railway init -n mi-trading-bot
 ```

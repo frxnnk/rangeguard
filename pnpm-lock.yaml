@@ -38,19 +38,19 @@ importers:
 
   apps/bot:
     dependencies:
-      '@trading-bot/common':
+      '@rangeguard/common':
         specifier: workspace:*
         version: link:../../packages/common
-      '@trading-bot/db':
+      '@rangeguard/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@trading-bot/hedging-engine':
+      '@rangeguard/hedging-engine':
         specifier: workspace:*
         version: link:../../packages/hedging-engine
-      '@trading-bot/pool-monitor':
+      '@rangeguard/pool-monitor':
         specifier: workspace:*
         version: link:../../packages/pool-monitor
-      '@trading-bot/security':
+      '@rangeguard/security':
         specifier: workspace:*
         version: link:../../packages/security
     devDependencies:
@@ -60,6 +60,31 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+
+  packages/backtest:
+    dependencies:
+      '@rangeguard/common':
+        specifier: workspace:*
+        version: link:../common
+      '@rangeguard/db':
+        specifier: workspace:*
+        version: link:../db
+      '@rangeguard/hedging-engine':
+        specifier: workspace:*
+        version: link:../hedging-engine
+      '@rangeguard/pool-monitor':
+        specifier: workspace:*
+        version: link:../pool-monitor
+    devDependencies:
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@25.4.0)(lightningcss@1.31.1)
 
   packages/common:
     dependencies:
@@ -82,15 +107,18 @@ importers:
 
   packages/dashboard:
     dependencies:
+      '@rangeguard/common':
+        specifier: workspace:*
+        version: link:../common
+      '@rangeguard/db':
+        specifier: workspace:*
+        version: link:../db
+      '@rangeguard/security':
+        specifier: workspace:*
+        version: link:../security
       '@tanstack/react-query':
         specifier: ^5.67.0
         version: 5.90.21(react@19.2.4)
-      '@trading-bot/common':
-        specifier: workspace:*
-        version: link:../common
-      '@trading-bot/db':
-        specifier: workspace:*
-        version: link:../db
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -127,6 +155,9 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+      viem:
+        specifier: ^2.47.1
+        version: 2.47.1(typescript@5.9.3)
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.0.0
@@ -149,7 +180,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@trading-bot/common':
+      '@rangeguard/common':
         specifier: workspace:*
         version: link:../common
       better-sqlite3:
@@ -180,13 +211,13 @@ importers:
       '@nktkas/hyperliquid':
         specifier: ^0.16.0
         version: 0.16.0
-      '@trading-bot/common':
+      '@rangeguard/common':
         specifier: workspace:*
         version: link:../common
-      '@trading-bot/db':
+      '@rangeguard/db':
         specifier: workspace:*
         version: link:../db
-      '@trading-bot/security':
+      '@rangeguard/security':
         specifier: workspace:*
         version: link:../security
       viem:
@@ -202,7 +233,7 @@ importers:
 
   packages/pool-monitor:
     dependencies:
-      '@trading-bot/common':
+      '@rangeguard/common':
         specifier: workspace:*
         version: link:../common
       viem:
@@ -221,7 +252,7 @@ importers:
       '@inquirer/prompts':
         specifier: ^7.3.0
         version: 7.10.1(@types/node@25.4.0)
-      '@trading-bot/common':
+      '@rangeguard/common':
         specifier: workspace:*
         version: link:../common
     devDependencies:

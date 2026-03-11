@@ -124,6 +124,21 @@ export function runMigrations(db: Database.Database): void {
     -- Using INSERT OR IGNORE pattern for idempotent column additions
   `);
 
+  // Add hedge ratio and per-pool cooldown columns (A1 quick wins)
+  const hedgeColumns = [
+    `ALTER TABLE pool_configs ADD COLUMN hedge_ratio REAL NOT NULL DEFAULT 1.0`,
+    `ALTER TABLE pool_configs ADD COLUMN hedge_cooldown_seconds INTEGER NOT NULL DEFAULT 300`,
+    `ALTER TABLE pool_configs ADD COLUMN debounce_count INTEGER NOT NULL DEFAULT 3`,
+  ];
+
+  for (const sql of hedgeColumns) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+
   // Add range trading columns to pool_configs (ALTERs are idempotent via try/catch)
   const tradingColumns = [
     `ALTER TABLE pool_configs ADD COLUMN trading_enabled INTEGER NOT NULL DEFAULT 0`,
@@ -171,5 +186,20 @@ export function runMigrations(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_range_trades_pool ON range_trades(pool_config_id);
     CREATE INDEX IF NOT EXISTS idx_range_trades_status ON range_trades(status);
     CREATE INDEX IF NOT EXISTS idx_range_trades_wallet ON range_trades(wallet_id);
+
+    CREATE INDEX IF NOT EXISTS idx_hedge_trades_pool_status ON hedge_trades(pool_config_id, status);
+    CREATE INDEX IF NOT EXISTS idx_range_trades_pool_status ON range_trades(pool_config_id, status);
+
+    CREATE TABLE IF NOT EXISTS bot_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      level TEXT NOT NULL,
+      name TEXT NOT NULL,
+      msg TEXT NOT NULL,
+      data TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_bot_logs_level ON bot_logs(level, created_at);
   `);
 }

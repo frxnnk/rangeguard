@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { v4 } from 'uuid';
-import type { HedgeTrade, WalletType, HedgeSide, CloseReason } from '@trading-bot/common';
+import type { HedgeTrade, WalletType, HedgeSide, CloseReason } from '@rangeguard/common';
 
 interface HedgeTradeRow {
   id: string;
@@ -235,6 +235,18 @@ export class HedgesRepository {
     `);
     const result = stmt.run(poolConfigId);
     return result.changes;
+  }
+
+  /** Closed trades for a wallet, sorted by close time ASC (for PnL sparkline) */
+  findClosedByWallet(walletId: string): Array<{ closedAt: number; realizedPnl: number }> {
+    const stmt = this.db.prepare(`
+      SELECT closed_at, CAST(realized_pnl AS REAL) as realized_pnl
+      FROM hedge_trades
+      WHERE wallet_id = ? AND status IN ('closed', 'liquidated') AND realized_pnl IS NOT NULL AND closed_at IS NOT NULL
+      ORDER BY closed_at ASC
+    `);
+    const rows = stmt.all(walletId) as Array<{ closed_at: number; realized_pnl: number }>;
+    return rows.map((r) => ({ closedAt: r.closed_at, realizedPnl: r.realized_pnl }));
   }
 
   /** Delete all closed/liquidated trades across all pools */

@@ -1,4 +1,4 @@
-import { createLogger } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
 import type { OrderResult, PositionInfo, AccountBalance } from './hyperliquid-client.js';
 
 const logger = createLogger('dry-run');
@@ -175,4 +175,8 @@ export class DryRunClient {
 
     return true;
   }
+
+  async preloadAssetMeta(): Promise<void> {}
+
+  async presetLeverage(_walletId: string, _asset: string, _leverage: number): Promise<void> {}
 }

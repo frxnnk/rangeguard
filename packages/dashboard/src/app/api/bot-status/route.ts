@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { pnlRepo } from '../db';
+import { resolveEnv } from '@rangeguard/common';
+import { pnlRepo, settingsRepo } from '../db';
 
 export async function GET() {
   try {
@@ -7,7 +8,8 @@ export async function GET() {
     const heartbeat = pnlRepo.getLatestPrice('__bot_heartbeat');
 
     if (!heartbeat) {
-      return NextResponse.json({ running: false, lastSeen: null });
+      const env = process.env.RANGEGUARD_ENV || settingsRepo.get('hl_environment') || 'testnet';
+      return NextResponse.json({ running: false, lastSeen: null, env });
     }
 
     // Parse the heartbeat timestamp (stored as the price string)
@@ -15,13 +17,15 @@ export async function GET() {
     const age = Date.now() - lastSeen;
     // Consider bot running if heartbeat is within last 30 seconds
     const running = age < 30_000;
+    const env = process.env.RANGEGUARD_ENV || settingsRepo.get('hl_environment') || 'testnet';
 
     return NextResponse.json({
       running,
       lastSeen,
       ageMs: age,
+      env,
     });
   } catch (error) {
-    return NextResponse.json({ running: false, lastSeen: null }, { status: 200 });
+    return NextResponse.json({ running: false, lastSeen: null, env: 'testnet' }, { status: 200 });
   }
 }

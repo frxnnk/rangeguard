@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { v4 } from 'uuid';
-import type { PoolConfig, CreatePoolConfig, PoolStatus } from '@trading-bot/common';
+import type { PoolConfig, CreatePoolConfig, PoolStatus } from '@rangeguard/common';
 
 interface PoolConfigRow {
   id: string;
@@ -20,6 +20,9 @@ interface PoolConfigRow {
   protection_direction: string;
   protection_wallet_id: string;
   profit_wallet_enabled: number;
+  hedge_ratio: number;
+  hedge_cooldown_seconds: number;
+  debounce_count: number;
   protection_active: number;
   status: string;
   current_price: string | null;
@@ -54,6 +57,9 @@ function rowToPoolConfig(row: PoolConfigRow): PoolConfig {
     protectionDirection: row.protection_direction as PoolConfig['protectionDirection'],
     protectionWalletId: row.protection_wallet_id,
     profitWalletEnabled: row.profit_wallet_enabled === 1,
+    hedgeRatio: row.hedge_ratio,
+    hedgeCooldownSeconds: row.hedge_cooldown_seconds,
+    debounceCount: row.debounce_count,
     protectionActive: row.protection_active === 1,
     status: row.status as PoolStatus,
     currentPrice: row.current_price ?? undefined,
@@ -85,13 +91,15 @@ export class PoolsRepository {
         id, name, chain_id, chain_name, rpc_url, pool_address,
         token0_symbol, token1_symbol, fee_tier, range_lower, range_upper,
         pool_amount, hedge_asset, leverage, protection_direction,
-        protection_wallet_id, profit_wallet_enabled, protection_active,
+        protection_wallet_id, profit_wallet_enabled, hedge_ratio,
+        hedge_cooldown_seconds, debounce_count, protection_active,
         status, created_at, updated_at
       ) VALUES (
         @id, @name, @chainId, @chainName, @rpcUrl, @poolAddress,
         @token0Symbol, @token1Symbol, @feeTier, @rangeLower, @rangeUpper,
         @poolAmount, @hedgeAsset, @leverage, @protectionDirection,
-        @protectionWalletId, @profitWalletEnabled, @protectionActive,
+        @protectionWalletId, @profitWalletEnabled, @hedgeRatio,
+        @hedgeCooldownSeconds, @debounceCount, @protectionActive,
         @status, @createdAt, @updatedAt
       )
     `);
@@ -114,6 +122,9 @@ export class PoolsRepository {
       protectionDirection: data.protectionDirection,
       protectionWalletId: data.protectionWalletId,
       profitWalletEnabled: data.profitWalletEnabled ? 1 : 0,
+      hedgeRatio: data.hedgeRatio ?? 1.0,
+      hedgeCooldownSeconds: data.hedgeCooldownSeconds ?? 300,
+      debounceCount: data.debounceCount ?? 3,
       protectionActive: data.protectionActive ? 1 : 0,
       status: 'in-range',
       createdAt: now,
@@ -215,6 +226,18 @@ export class PoolsRepository {
     if (data.profitWalletEnabled !== undefined) {
       fields.push('profit_wallet_enabled = @profitWalletEnabled');
       values.profitWalletEnabled = data.profitWalletEnabled ? 1 : 0;
+    }
+    if (data.hedgeRatio !== undefined) {
+      fields.push('hedge_ratio = @hedgeRatio');
+      values.hedgeRatio = data.hedgeRatio;
+    }
+    if (data.hedgeCooldownSeconds !== undefined) {
+      fields.push('hedge_cooldown_seconds = @hedgeCooldownSeconds');
+      values.hedgeCooldownSeconds = data.hedgeCooldownSeconds;
+    }
+    if (data.debounceCount !== undefined) {
+      fields.push('debounce_count = @debounceCount');
+      values.debounceCount = data.debounceCount;
     }
     if (data.protectionActive !== undefined) {
       fields.push('protection_active = @protectionActive');

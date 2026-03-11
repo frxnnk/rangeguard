@@ -4,7 +4,7 @@ import { Providers } from './providers';
 import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
-  title: 'Trading Bot CGR',
+  title: 'RangeGuard',
   description: 'Hedging bot for concentrated liquidity pools',
   other: {
     'theme-color': '#1a1a1a',

@@ -1,17 +1,17 @@
-import { createLogger } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
 import type {
   RangeExitEvent,
   RangeReturnEvent,
   HedgeOpenedEvent,
   HedgeClosedEvent,
-} from '@trading-bot/common';
+} from '@rangeguard/common';
 import type {
   PoolsRepository,
   HedgesRepository,
   WalletsRepository,
   TradeLogRepository,
   StopLossRepository,
-} from '@trading-bot/db';
+} from '@rangeguard/db';
 import { HedgeCalculator } from './hedge-calculator.js';
 import { OrderExecutor } from './order-executor.js';
 import { PositionTracker } from './position-tracker.js';

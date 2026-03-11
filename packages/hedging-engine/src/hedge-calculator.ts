@@ -1,5 +1,5 @@
-import { createLogger } from '@trading-bot/common';
-import type { PoolConfig, HedgeSide } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
+import type { PoolConfig, HedgeSide } from '@rangeguard/common';
 
 const logger = createLogger('hedge-calculator');
 
@@ -35,9 +35,12 @@ export class HedgeCalculator {
 
     const side: HedgeSide = exitDirection === 'below' ? 'short' : 'long';
 
+    // hedgeRatio: 1.0 = full hedge, 0.5 = half, etc.
+    const hedgeRatio = config.hedgeRatio ?? 1.0;
+
     // The pool amount is the total value.
-    // Size for HL = poolAmount / currentPrice (convert USD to asset units)
-    const sizeInAsset = poolAmountUsd / currentPrice;
+    // Size for HL = (poolAmount * hedgeRatio) / currentPrice (convert USD to asset units)
+    const sizeInAsset = (poolAmountUsd * hedgeRatio) / currentPrice;
 
     // Round to reasonable precision
     const size = formatSize(sizeInAsset, config.hedgeAsset);
@@ -54,6 +57,7 @@ export class HedgeCalculator {
         asset: config.hedgeAsset,
         side,
         poolAmountUsd,
+        hedgeRatio,
         currentPrice,
         sizeInAsset: size,
         leverage: config.leverage,

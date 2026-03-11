@@ -50,9 +50,11 @@ function generateWallet(): { privateKey: string; address: string } {
 }
 
 // --- Config ---
+process.env.RANGEGUARD_ENV = process.env.RANGEGUARD_ENV || 'testnet';
+const env = 'testnet';
 const monorepoRoot = resolve(import.meta.dirname!, '..');
-const dbPath = process.env.DB_PATH || resolve(monorepoRoot, 'data', 'bot.db');
-const vaultPath = process.env.VAULT_PATH || resolve(homedir(), '.trading-bot-cgr', 'vault.enc');
+const dbPath = process.env.DB_PATH || resolve(monorepoRoot, 'data', `bot-${env}.db`);
+const vaultPath = process.env.VAULT_PATH || resolve(homedir(), '.rangeguard', `vault-${env}.enc`);
 const vaultPassword = process.env.VAULT_PASSWORD;
 
 if (!vaultPassword) {
@@ -61,7 +63,7 @@ if (!vaultPassword) {
 }
 
 // --- Generate wallets ---
-console.log('\n=== Trading Bot Testnet Setup ===\n');
+console.log('\n=== RangeGuard Testnet Setup ===\n');
 
 const wallets = [
   { alias: 'pool-eth-arb', type: 'protection' as const },

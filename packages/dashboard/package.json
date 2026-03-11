@@ -1,5 +1,5 @@
 {
-  "name": "@trading-bot/dashboard",
+  "name": "@rangeguard/dashboard",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rangeguard/common": "workspace:*",
+    "@rangeguard/db": "workspace:*",
+    "@rangeguard/security": "workspace:*",
     "@tanstack/react-query": "^5.67.0",
-    "@trading-bot/common": "workspace:*",
-    "@trading-bot/db": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
@@ -24,7 +25,8 @@
     "recharts": "^2.15.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "tw-animate-css": "^1.4.0"
+    "tw-animate-css": "^1.4.0",
+    "viem": "^2.47.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

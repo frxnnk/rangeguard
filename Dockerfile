@@ -14,19 +14,20 @@ COPY packages/security/package.json packages/security/
 COPY packages/pool-monitor/package.json packages/pool-monitor/
 COPY packages/hedging-engine/package.json packages/hedging-engine/
 COPY packages/dashboard/package.json packages/dashboard/
+COPY packages/backtest/package.json packages/backtest/
 COPY apps/bot/package.json apps/bot/
 RUN pnpm install --frozen-lockfile
 
 # ---- dashboard-build ----
 FROM deps AS dashboard-build
 COPY . .
-RUN pnpm --filter @trading-bot/dashboard build
+RUN pnpm --filter @rangeguard/dashboard build
 
 # ---- bot (target) ----
 FROM deps AS bot
 COPY . .
 RUN mkdir -p /app/data && chown botuser:botuser /app/data
-RUN mkdir -p /home/botuser/.trading-bot-cgr && chown botuser:botuser /home/botuser/.trading-bot-cgr
+RUN mkdir -p /home/botuser/.rangeguard && chown botuser:botuser /home/botuser/.rangeguard
 ENV NODE_ENV=production
 USER botuser
 CMD ["node", "--no-warnings", "--import", "tsx", "apps/bot/src/main.ts"]
@@ -40,17 +41,18 @@ COPY --from=deps /app/packages/db/node_modules ./packages/db/node_modules
 COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
 COPY . .
 RUN mkdir -p /app/data && chown botuser:botuser /app/data
+RUN mkdir -p /home/botuser/.rangeguard && chown botuser:botuser /home/botuser/.rangeguard
 ENV NODE_ENV=production
 USER botuser
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@trading-bot/dashboard", "start"]
+CMD ["pnpm", "--filter", "@rangeguard/dashboard", "start"]
 
 # ---- combined (single service for Railway — no VOLUME, Railway manages volumes) ----
 FROM deps AS combined
 COPY . .
 COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
 RUN mkdir -p /app/data && chown botuser:botuser /app/data
-RUN mkdir -p /home/botuser/.trading-bot-cgr && chown botuser:botuser /home/botuser/.trading-bot-cgr
+RUN mkdir -p /home/botuser/.rangeguard && chown botuser:botuser /home/botuser/.rangeguard
 ENV NODE_ENV=production
 USER botuser
 EXPOSE 3000

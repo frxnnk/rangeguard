@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { v4 } from 'uuid';
-import type { TradeLogEntry } from '@trading-bot/common';
+import type { TradeLogEntry } from '@rangeguard/common';
 
 interface TradeLogRow {
   id: string;

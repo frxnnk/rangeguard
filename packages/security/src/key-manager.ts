@@ -1,5 +1,5 @@
 import type { Vault } from './vault.js';
-import { createLogger } from '@trading-bot/common';
+import { createLogger } from '@rangeguard/common';
 
 const logger = createLogger('key-manager');
 

@@ -6,8 +6,10 @@ services:
     init: true
     volumes:
       - bot-data:/app/data
-      - vault-data:/home/botuser/.trading-bot-cgr
+      - vault-data:/home/botuser/.rangeguard
     env_file: .env
+    environment:
+      - RANGEGUARD_ENV=${RANGEGUARD_ENV:-testnet}
     restart: unless-stopped
     healthcheck:
       test:
@@ -15,7 +17,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "const fs=require('fs');const s=fs.statSync('/app/data/bot.db');process.exit(Date.now()-s.mtimeMs>120000?1:0)",
+          "const fs=require('fs');const e=process.env.RANGEGUARD_ENV||'testnet';const s=fs.statSync(`/app/data/bot-${e}.db`);process.exit(Date.now()-s.mtimeMs>120000?1:0)",
         ]
       interval: 30s
       timeout: 10s
@@ -34,7 +36,10 @@ services:
       - '3000:3000'
     volumes:
       - bot-data:/app/data
+      - vault-data:/home/botuser/.rangeguard
     env_file: .env
+    environment:
+      - RANGEGUARD_ENV=${RANGEGUARD_ENV:-testnet}
     depends_on:
       bot:
         condition: service_healthy

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { PoolConfig, ProtectionDirection } from '@trading-bot/common';
+import type { PoolConfig, ProtectionDirection } from '@rangeguard/common';
 import { RangeDetector } from './range-detector.js';
 
 function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
@@ -20,6 +20,9 @@ function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
     protectionDirection: 'below' as ProtectionDirection,
     protectionWalletId: 'wallet-1',
     profitWalletEnabled: false,
+    hedgeRatio: 1.0,
+    hedgeCooldownSeconds: 300,
+    debounceCount: 3,
     protectionActive: true,
     status: 'in-range',
     createdAt: Date.now(),
@@ -107,14 +110,15 @@ describe('RangeDetector', () => {
       );
     });
 
-    it('should reset debounce count when price oscillates back in range', () => {
+    it('should reset debounce signal when price oscillates back in range', () => {
       detector.register(makeConfig({ protectionDirection: 'both' }));
 
-      // 2 out-of-range, then back in range, then 1 out-of-range
-      detector.onPriceUpdate('pool-1', 1700);
-      detector.onPriceUpdate('pool-1', 1700);
-      detector.onPriceUpdate('pool-1', 2000); // back in range, resets count
-      detector.onPriceUpdate('pool-1', 1700); // count restarts at 1
+      // 2 out-of-range (normal weight), then back in range, then 1 out-of-range
+      // Using 1795 (deviation 5/400=1.25% → weight 1.0) to avoid strong-signal fast trigger
+      detector.onPriceUpdate('pool-1', 1795); // signal = 1.0
+      detector.onPriceUpdate('pool-1', 1795); // signal = 2.0
+      detector.onPriceUpdate('pool-1', 2000); // back in range, resets signal
+      detector.onPriceUpdate('pool-1', 1795); // signal restarts at 1.0
 
       expect(onRangeExit).not.toHaveBeenCalled();
     });
@@ -172,6 +176,122 @@ describe('RangeDetector', () => {
       detector.onPriceUpdate('pool-1', 1700);
 
       // Should NOT fire a second exit
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('per-pool cooldown', () => {
+    it('should use per-pool hedgeCooldownSeconds instead of global cooldown', () => {
+      let now = 1_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+      // Pool with 60-second cooldown (much shorter than default 5 min)
+      detector.register(makeConfig({ protectionDirection: 'both', hedgeCooldownSeconds: 60 }));
+
+      // Trigger exit
+      detector.onPriceUpdate('pool-1', 1700);
+      detector.onPriceUpdate('pool-1', 1700);
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
+
+      // Return to range
+      now += 10_000;
+      detector.onPriceUpdate('pool-1', 2000);
+      detector.onPriceUpdate('pool-1', 2000);
+      detector.onPriceUpdate('pool-1', 2000);
+      expect(onRangeReturn).toHaveBeenCalledTimes(1);
+
+      // Try to exit again at 70s (after 60s per-pool cooldown)
+      now += 61_000;
+      detector.onPriceUpdate('pool-1', 1700);
+      detector.onPriceUpdate('pool-1', 1700);
+
+      // Should fire because per-pool cooldown (60s) has passed
+      expect(onRangeExit).toHaveBeenCalledTimes(2);
+    });
+
+    it('should update cooldown via updateConfig', () => {
+      let now = 1_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+
+      detector.register(makeConfig({ protectionDirection: 'both', hedgeCooldownSeconds: 300 }));
+
+      // Trigger exit
+      detector.onPriceUpdate('pool-1', 1700);
+      detector.onPriceUpdate('pool-1', 1700);
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
+
+      // Return to range
+      now += 10_000;
+      detector.onPriceUpdate('pool-1', 2000);
+      detector.onPriceUpdate('pool-1', 2000);
+      detector.onPriceUpdate('pool-1', 2000);
+
+      // Update cooldown to 30s
+      detector.updateConfig('pool-1', 1800, 2200, 'both', 30);
+
+      // Try to exit at 40s (within old 300s cooldown, but after new 30s)
+      now += 41_000;
+      detector.onPriceUpdate('pool-1', 1700);
+      detector.onPriceUpdate('pool-1', 1700);
+
+      expect(onRangeExit).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('per-pool debounce', () => {
+    it('should use per-pool debounceCount instead of global default', () => {
+      // Pool with debounceCount=2 (lower than global default of 3)
+      detector.register(
+        makeConfig({ protectionDirection: 'both', debounceCount: 2 }),
+      );
+
+      // Price 1795: deviation ~1.25% → weight 1.0
+      // With debounceCount=2, needs 2 observations
+      detector.onPriceUpdate('pool-1', 1795);
+      expect(onRangeExit).not.toHaveBeenCalled(); // 1.0 < 2
+
+      detector.onPriceUpdate('pool-1', 1795);
+      expect(onRangeExit).toHaveBeenCalledTimes(1); // 2.0 >= 2
+    });
+
+    it('should allow different debounce per pool', () => {
+      // Pool A: debounceCount=2
+      detector.register(
+        makeConfig({ id: 'pool-a', protectionDirection: 'both', debounceCount: 2 }),
+      );
+      // Pool B: debounceCount=5
+      detector.register(
+        makeConfig({ id: 'pool-b', protectionDirection: 'both', debounceCount: 5 }),
+      );
+
+      // Strong signal (weight 1.5) — 2 observations
+      detector.onPriceUpdate('pool-a', 1700); // pool-a: 1.5
+      detector.onPriceUpdate('pool-b', 1700); // pool-b: 1.5
+      detector.onPriceUpdate('pool-a', 1700); // pool-a: 3.0 >= 2 → triggers
+      detector.onPriceUpdate('pool-b', 1700); // pool-b: 3.0 < 5
+
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
+      expect(onRangeExit).toHaveBeenCalledWith(
+        expect.objectContaining({ poolConfigId: 'pool-a' }),
+      );
+    });
+
+    it('should update debounce via updateConfig', () => {
+      detector.register(
+        makeConfig({ protectionDirection: 'both', debounceCount: 5 }),
+      );
+
+      // Price 1795: weight 1.0
+      detector.onPriceUpdate('pool-1', 1795); // signal = 1.0
+      detector.onPriceUpdate('pool-1', 1795); // signal = 2.0
+
+      // Lower the debounce to 2
+      detector.updateConfig('pool-1', 1800, 2200, 'both', undefined, 2);
+
+      // Signal is already at 2.0 but the pending state was below, next tick should confirm
+      // Actually signal was already 2.0 which is >= new debounce of 2, but we need a new price update
+      detector.onPriceUpdate('pool-1', 1795); // signal = 3.0 >= 2
+
       expect(onRangeExit).toHaveBeenCalledTimes(1);
     });
   });
@@ -245,19 +365,70 @@ describe('RangeDetector', () => {
     it('should update range parameters so previously out-of-range price is now in-range', () => {
       detector.register(makeConfig({ protectionDirection: 'both' }));
 
-      // Price 1700 is below rangeLower=1800, would normally trigger exit
-      detector.onPriceUpdate('pool-1', 1700);
-      detector.onPriceUpdate('pool-1', 1700);
-      // 2 out of 3 - not triggered yet
+      // Price 1795 is below rangeLower=1800 (weight 1.0, signal accumulates slowly)
+      detector.onPriceUpdate('pool-1', 1795); // signal = 1.0
+      detector.onPriceUpdate('pool-1', 1795); // signal = 2.0
+      // 2 of 3 - not triggered yet
 
       // Now widen the range: lower to 1500
       detector.updateConfig('pool-1', 1500, 2200, 'both');
 
-      // Reset by sending an in-range price (1700 is now in range since lower=1500)
+      // 1795 is now in range since lower=1500 → resets signal
+      detector.onPriceUpdate('pool-1', 1795);
+
+      expect(onRangeExit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('adaptive signal weight', () => {
+    it('should trigger faster with strong signal (>2% deviation)', () => {
+      detector.register(makeConfig({ protectionDirection: 'both' }));
+
+      // Price 1700: deviation = 100/400 = 25% → weight 1.5
+      // 2 observations × 1.5 = 3.0 ≥ debounceCount(3)
+      detector.onPriceUpdate('pool-1', 1700);
       detector.onPriceUpdate('pool-1', 1700);
 
-      // The 1700 update is now in-range, so it should not fire exit
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should trigger normally with moderate signal (0.5-2% deviation)', () => {
+      detector.register(makeConfig({ protectionDirection: 'both' }));
+
+      // Price 1795: deviation = 5/400 = 1.25% → weight 1.0
+      // Needs exactly 3 observations
+      detector.onPriceUpdate('pool-1', 1795);
+      detector.onPriceUpdate('pool-1', 1795);
+      expect(onRangeExit).not.toHaveBeenCalled(); // 2.0 < 3
+
+      detector.onPriceUpdate('pool-1', 1795);
+      expect(onRangeExit).toHaveBeenCalledTimes(1); // 3.0 ≥ 3
+    });
+
+    it('should trigger slower with weak signal (<0.5% deviation)', () => {
+      detector.register(makeConfig({ protectionDirection: 'both' }));
+
+      // Price 1799: deviation = 1/400 = 0.25% → weight 0.75
+      // Needs 4 observations (4 × 0.75 = 3.0 ≥ 3)
+      detector.onPriceUpdate('pool-1', 1799);
+      detector.onPriceUpdate('pool-1', 1799);
+      detector.onPriceUpdate('pool-1', 1799);
+      expect(onRangeExit).not.toHaveBeenCalled(); // 2.25 < 3
+
+      detector.onPriceUpdate('pool-1', 1799);
+      expect(onRangeExit).toHaveBeenCalledTimes(1); // 3.0 ≥ 3
+    });
+
+    it('should handle mixed signal weights correctly', () => {
+      detector.register(makeConfig({ protectionDirection: 'both' }));
+
+      // Mix of weak and strong signals
+      detector.onPriceUpdate('pool-1', 1799); // weak: 0.75 (total: 0.75)
+      detector.onPriceUpdate('pool-1', 1700); // strong: 1.5 (total: 2.25)
       expect(onRangeExit).not.toHaveBeenCalled();
+
+      detector.onPriceUpdate('pool-1', 1795); // moderate: 1.0 (total: 3.25)
+      expect(onRangeExit).toHaveBeenCalledTimes(1);
     });
   });
 });

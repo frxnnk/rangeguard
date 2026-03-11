@@ -1,15 +1,17 @@
 import { resolve } from 'path';
+import { resolveEnv, defaultDbPath } from '@rangeguard/common';
 import {
   getDatabase,
   closeDatabase,
   runMigrations,
   PoolsRepository,
   WalletsRepository,
-} from '@trading-bot/db';
+} from '@rangeguard/db';
 
-// Resolve DB path relative to monorepo root (scripts/ is one level deep)
-const monorepoRoot = resolve(__dirname, '..');
-const dbPath = process.env.DB_PATH || resolve(monorepoRoot, 'data', 'bot.db');
+// Resolve DB path relative to monorepo root
+const monorepoRoot = resolve(import.meta.dirname!, '..');
+const env = resolveEnv();
+const dbPath = process.env.DB_PATH || defaultDbPath(monorepoRoot, env);
 
 const db = getDatabase(dbPath);
 runMigrations(db);
@@ -17,9 +19,12 @@ runMigrations(db);
 // Clean existing data in FK-safe order (works even if bot/dashboard hold the DB open)
 db.exec(`
   DELETE FROM pnl_snapshots;
-  DELETE FROM trade_log;
-  DELETE FROM hedge_trades;
   DELETE FROM price_cache;
+  DELETE FROM trade_log;
+  DELETE FROM bot_logs;
+  DELETE FROM range_trades;
+  DELETE FROM hedge_trades;
+  DELETE FROM stop_loss_orders;
   DELETE FROM pool_configs;
   DELETE FROM wallets;
 `);

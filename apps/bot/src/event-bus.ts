@@ -8,7 +8,7 @@ import type {
   RangeTradeOpenedEvent,
   RangeTradeClosedEvent,
   WalletBalanceUpdate,
-} from '@trading-bot/common';
+} from '@rangeguard/common';
 
 interface BotEvents {
   'price-update': (data: PriceUpdate) => void;

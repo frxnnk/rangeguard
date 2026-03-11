@@ -1,5 +1,5 @@
-import { createLogger, type PoolConfig, type ProtectionDirection } from '@trading-bot/common';
-import type { RangeExitEvent, RangeReturnEvent } from '@trading-bot/common';
+import { createLogger, type PoolConfig, type ProtectionDirection } from '@rangeguard/common';
+import type { RangeExitEvent, RangeReturnEvent } from '@rangeguard/common';
 
 const logger = createLogger('range-detector');
 
@@ -9,10 +9,12 @@ interface PoolState {
   configId: string;
   currentState: RangeState;
   pendingState: RangeState | null;
-  consecutiveCount: number;
+  signalStrength: number;
   protectionDirection: ProtectionDirection;
   rangeLower: number;
   rangeUpper: number;
+  debounceCount: number; // per-pool debounce threshold
+  cooldownMs: number; // per-pool cooldown duration
   lastTransitionAt: number;
   cooldownUntil: number;
 }
@@ -41,14 +43,21 @@ export class RangeDetector {
 
   /** Register a pool config for range detection */
   register(config: PoolConfig): void {
+    // Per-pool cooldown if configured, otherwise fall back to global default
+    const poolCooldownMs = config.hedgeCooldownSeconds
+      ? config.hedgeCooldownSeconds * 1000
+      : this.cooldownMs;
+
     this.states.set(config.id, {
       configId: config.id,
       currentState: 'in-range', // Always start fresh — let debounce detect current state
       pendingState: null,
-      consecutiveCount: 0,
+      signalStrength: 0,
       protectionDirection: config.protectionDirection,
       rangeLower: config.rangeLower,
       rangeUpper: config.rangeUpper,
+      debounceCount: config.debounceCount ?? this.debounceCount,
+      cooldownMs: poolCooldownMs,
       lastTransitionAt: 0,
       cooldownUntil: 0,
     });
@@ -69,12 +78,24 @@ export class RangeDetector {
     rangeLower: number,
     rangeUpper: number,
     direction: ProtectionDirection,
+    cooldownSeconds?: number,
+    debounceCount?: number,
   ): void {
     const state = this.states.get(configId);
     if (state) {
       state.rangeLower = rangeLower;
       state.rangeUpper = rangeUpper;
       state.protectionDirection = direction;
+      if (cooldownSeconds !== undefined) {
+        state.cooldownMs = cooldownSeconds * 1000;
+        // Recalculate cooldownUntil based on last transition
+        if (state.lastTransitionAt > 0) {
+          state.cooldownUntil = state.lastTransitionAt + state.cooldownMs;
+        }
+      }
+      if (debounceCount !== undefined) {
+        state.debounceCount = debounceCount;
+      }
     }
   }
 
@@ -101,26 +122,30 @@ export class RangeDetector {
     // If same as current confirmed state, reset pending
     if (observedState === state.currentState) {
       state.pendingState = null;
-      state.consecutiveCount = 0;
+      state.signalStrength = 0;
       return;
     }
 
-    // Accumulate consecutive observations of the new state
+    // Calculate signal weight based on price deviation from range boundary
+    const weight = this.calculateSignalWeight(currentPrice, state);
+
+    // Accumulate weighted signal strength
     if (observedState === state.pendingState) {
-      state.consecutiveCount++;
+      state.signalStrength += weight;
     } else {
       state.pendingState = observedState;
-      state.consecutiveCount = 1;
+      state.signalStrength = weight;
     }
 
-    // Check if debounce threshold met
-    if (state.consecutiveCount < this.debounceCount) {
+    // Check if debounce threshold met (using signal strength vs per-pool debounceCount)
+    if (state.signalStrength < state.debounceCount) {
       logger.debug(
         {
           configId,
           observed: observedState,
-          count: state.consecutiveCount,
-          needed: this.debounceCount,
+          signal: state.signalStrength.toFixed(2),
+          needed: state.debounceCount,
+          weight: weight.toFixed(2),
         },
         'Debounce accumulating',
       );
@@ -131,7 +156,7 @@ export class RangeDetector {
     const previousState = state.currentState;
     state.currentState = observedState;
     state.pendingState = null;
-    state.consecutiveCount = 0;
+    state.signalStrength = 0;
     state.lastTransitionAt = now;
 
     logger.info(
@@ -154,7 +179,7 @@ export class RangeDetector {
         previousDirection,
         timestamp: now,
       });
-      state.cooldownUntil = now + this.cooldownMs;
+      state.cooldownUntil = now + state.cooldownMs;
     } else if (observedState !== 'in-range' && previousState === 'in-range') {
       // Range exit - check cooldown
       if (now < state.cooldownUntil) {
@@ -186,6 +211,31 @@ export class RangeDetector {
         timestamp: now,
       });
     }
+  }
+
+  /** Calculate signal weight based on how far the price is from the range boundary */
+  private calculateSignalWeight(currentPrice: number, state: PoolState): number {
+    const rangeWidth = state.rangeUpper - state.rangeLower;
+    if (rangeWidth <= 0) return 1.0;
+
+    let deviation: number;
+    if (currentPrice < state.rangeLower) {
+      deviation = (state.rangeLower - currentPrice) / rangeWidth;
+    } else if (currentPrice > state.rangeUpper) {
+      deviation = (currentPrice - state.rangeUpper) / rangeWidth;
+    } else {
+      // Price is in range — deviation from nearest boundary
+      const distToLower = currentPrice - state.rangeLower;
+      const distToUpper = state.rangeUpper - currentPrice;
+      deviation = Math.min(distToLower, distToUpper) / rangeWidth;
+    }
+
+    // >2% of range width → strong signal (weight 1.5, triggers in ~2 observations)
+    if (deviation > 0.02) return 1.5;
+    // 0.5-2% → normal signal (weight 1.0, triggers in 3 observations like before)
+    if (deviation >= 0.005) return 1.0;
+    // <0.5% → weak signal near boundary (weight 0.75, triggers in ~4 observations)
+    return 0.75;
   }
 
   private isDirectionProtected(

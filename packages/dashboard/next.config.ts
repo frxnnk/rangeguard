@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@trading-bot/common', '@trading-bot/db'],
+  transpilePackages: ['@rangeguard/common', '@rangeguard/db', '@rangeguard/security'],
   serverExternalPackages: ['better-sqlite3'],
   webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {

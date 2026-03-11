@@ -1,5 +1,5 @@
 {
-  "name": "@trading-bot/pool-monitor",
+  "name": "@rangeguard/pool-monitor",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@trading-bot/common": "workspace:*",
+    "@rangeguard/common": "workspace:*",
     "viem": "^2.23.0"
   },
   "devDependencies": {

@@ -10,11 +10,13 @@ import {
   Wallet,
   Shield,
   Clock,
+  ScrollText,
   Settings,
   Info,
   Menu,
   LogOut,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
   { href: '/', label: 'Resumen', icon: LayoutGrid },
@@ -22,6 +24,7 @@ const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
   { href: '/wallets', label: 'Billeteras', icon: Wallet },
   { href: '/hedges', label: 'Coberturas', icon: Shield },
   { href: '/history', label: 'Historial', icon: Clock },
+  { href: '/logs', label: 'Logs', icon: ScrollText },
   { href: '/settings', label: 'Configuración', icon: Settings },
   { href: '/about', label: 'Acerca de', icon: Info },
 ];
@@ -30,7 +33,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const { data: botStatus } = useQuery<{ running: boolean; lastSeen: number | null }>({
+  const { data: botStatus } = useQuery<{ running: boolean; lastSeen: number | null; env?: string }>({
     queryKey: ['bot-status'],
     queryFn: () => fetch('/api/bot-status').then((r) => r.json()),
     refetchInterval: 10_000,
@@ -41,7 +44,15 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       <div className="p-6 border-b border-sidebar-border">
-        <h1 className="text-xl font-bold text-sidebar-foreground">Trading Bot</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-sidebar-foreground">RangeGuard</h1>
+          <Badge
+            variant={botStatus?.env === 'mainnet' ? 'destructive' : 'secondary'}
+            className="text-[10px]"
+          >
+            {(botStatus?.env || 'testnet').toUpperCase()}
+          </Badge>
+        </div>
         <p className="text-xs text-muted-foreground mt-1">Cobertura de Pools de Liquidez</p>
       </div>
 

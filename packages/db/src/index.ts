@@ -9,3 +9,5 @@ export { SettingsRepository } from './repositories/settings.repo.js';
 export { StopLossRepository } from './repositories/stop-loss.repo.js';
 export type { StopLossOrder } from './repositories/stop-loss.repo.js';
 export { RangeTradesRepository } from './repositories/range-trades.repo.js';
+export { LogsRepository } from './repositories/logs.repo.js';
+export type { LogEntry } from './repositories/logs.repo.js';

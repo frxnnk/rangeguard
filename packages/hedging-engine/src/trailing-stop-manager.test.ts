@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TrailingStopManager, type TrailingStopTrigger } from './trailing-stop-manager.js';
-import type { RangeTrade } from '@trading-bot/common';
+import type { RangeTrade } from '@rangeguard/common';
 
 function makeMockRepo() {
   return {

@@ -1,6 +1,6 @@
-import { createLogger } from '@trading-bot/common';
-import type { PoolConfig, RangeTradeOpenedEvent, RangeTradeClosedEvent } from '@trading-bot/common';
-import type { PoolsRepository, RangeTradesRepository, TradeLogRepository } from '@trading-bot/db';
+import { createLogger } from '@rangeguard/common';
+import type { PoolConfig, RangeTradeOpenedEvent, RangeTradeClosedEvent } from '@rangeguard/common';
+import type { PoolsRepository, RangeTradesRepository, TradeLogRepository } from '@rangeguard/db';
 import { EntryZoneDetector, type EntrySignal } from './entry-zone-detector.js';
 import { TrailingStopManager, type TrailingStopTrigger } from './trailing-stop-manager.js';
 import { OrderExecutor } from './order-executor.js';

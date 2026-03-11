@@ -2,13 +2,15 @@
 
 import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -38,6 +40,15 @@ interface Wallet {
   walletType: string;
 }
 
+function SectionHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="mb-4">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+    </div>
+  );
+}
+
 export default function EditPoolPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -57,6 +68,9 @@ export default function EditPoolPage() {
     rangeUpper: '',
     poolAmount: '',
     leverage: 10,
+    hedgeRatio: '1.0',
+    hedgeCooldownSeconds: '300',
+    debounceCount: '3',
     protectionDirection: 'both' as 'below' | 'above' | 'both',
     protectionWalletId: '',
     profitWalletEnabled: true,
@@ -92,6 +106,9 @@ export default function EditPoolPage() {
           rangeUpper: pool.rangeUpper.toString(),
           poolAmount: pool.poolAmount,
           leverage: pool.leverage,
+          hedgeRatio: (pool.hedgeRatio ?? 1.0).toString(),
+          hedgeCooldownSeconds: (pool.hedgeCooldownSeconds ?? 300).toString(),
+          debounceCount: (pool.debounceCount ?? 3).toString(),
           protectionDirection: pool.protectionDirection,
           protectionWalletId: pool.protectionWalletId,
           profitWalletEnabled: pool.profitWalletEnabled,
@@ -133,6 +150,9 @@ export default function EditPoolPage() {
         rangeUpper: parseFloat(form.rangeUpper),
         poolAmount: form.poolAmount,
         leverage: form.leverage,
+        hedgeRatio: parseFloat(form.hedgeRatio),
+        hedgeCooldownSeconds: parseInt(form.hedgeCooldownSeconds),
+        debounceCount: parseInt(form.debounceCount),
         protectionDirection: form.protectionDirection,
         protectionWalletId: form.protectionWalletId,
         profitWalletEnabled: form.profitWalletEnabled,
@@ -180,14 +200,27 @@ export default function EditPoolPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <p className="text-sm text-muted-foreground mb-1">Pool / Editar Pool</p>
-        <h1 className="text-2xl font-bold text-foreground">Editar Pool</h1>
-      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        <Link href="/pools" className="hover:text-foreground transition-colors">
+          Pools
+        </Link>
+        {' / '}
+        <Link href={`/pools/${id}`} className="hover:text-foreground transition-colors">
+          {form.name || 'Pool'}
+        </Link>
+        {' / '}
+        <span className="text-foreground">Editar</span>
+      </p>
 
       <Card className="max-w-2xl">
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardHeader>
+          <CardTitle className="text-xl">Editar Pool</CardTitle>
+          <CardDescription>
+            Modificá la configuración del pool y sus parámetros de protección
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-8">
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="size-4" />
@@ -195,196 +228,295 @@ export default function EditPoolPage() {
               </Alert>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Red</Label>
-                <Select
-                  value={form.chainId.toString()}
-                  onValueChange={(value) => {
-                    const chainId = parseInt(value);
-                    const chain = CHAINS.find((c) => c.id === chainId);
-                    setForm((f) => ({ ...f, chainId, chainName: chain?.name || '' }));
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CHAINS.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Nivel de Fee</Label>
-                <Select
-                  value={form.feeTier.toString()}
-                  onValueChange={(value) => setForm((f) => ({ ...f, feeTier: parseInt(value) }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FEE_TIERS.map((ft) => (
-                      <SelectItem key={ft.value} value={ft.value.toString()}>
-                        {ft.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Dirección del Pool</Label>
-              <Input
-                type="text"
-                value={form.poolAddress}
-                onChange={(e) => setForm((f) => ({ ...f, poolAddress: e.target.value }))}
-                className="bg-muted border-border text-foreground font-mono"
+            {/* ── Section 1: Pool Identification ── */}
+            <section className="space-y-4">
+              <SectionHeader
+                title="Identificación del Pool"
+                description="Red, dirección y nivel de fee del pool"
               />
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Red</Label>
+                  <Select
+                    value={form.chainId.toString()}
+                    onValueChange={(value) => {
+                      const chainId = parseInt(value);
+                      const chain = CHAINS.find((c) => c.id === chainId);
+                      setForm((f) => ({ ...f, chainId, chainName: chain?.name || '' }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHAINS.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fee Tier</Label>
+                  <Select
+                    value={form.feeTier.toString()}
+                    onValueChange={(value) =>
+                      setForm((f) => ({ ...f, feeTier: parseInt(value) }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FEE_TIERS.map((ft) => (
+                        <SelectItem key={ft.value} value={ft.value.toString()}>
+                          {ft.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>Rango Inferior ($)</Label>
+                <Label>Dirección del Pool</Label>
+                <Input
+                  type="text"
+                  value={form.poolAddress}
+                  onChange={(e) => setForm((f) => ({ ...f, poolAddress: e.target.value }))}
+                  className="bg-muted border-border text-foreground font-mono"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  Nombre <span className="text-muted-foreground font-normal">(opcional)</span>
+                </Label>
+                <Input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="bg-muted border-border text-foreground"
+                />
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* ── Section 2: Price Range ── */}
+            <section className="space-y-4">
+              <SectionHeader
+                title="Rango de Precios"
+                description="Límites de liquidez concentrada y monto total invertido"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Rango Inferior ($)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={form.rangeLower}
+                    onChange={(e) => setForm((f) => ({ ...f, rangeLower: e.target.value }))}
+                    required
+                    className="bg-muted border-border text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Rango Superior ($)</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={form.rangeUpper}
+                    onChange={(e) => setForm((f) => ({ ...f, rangeUpper: e.target.value }))}
+                    required
+                    className="bg-muted border-border text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Monto del Pool (USD)</Label>
                 <Input
                   type="number"
                   step="any"
-                  value={form.rangeLower}
-                  onChange={(e) => setForm((f) => ({ ...f, rangeLower: e.target.value }))}
+                  value={form.poolAmount}
+                  onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
                   required
                   className="bg-muted border-border text-foreground"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Rango Superior ($)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={form.rangeUpper}
-                  onChange={(e) => setForm((f) => ({ ...f, rangeUpper: e.target.value }))}
-                  required
-                  className="bg-muted border-border text-foreground"
-                />
-              </div>
-            </div>
+            </section>
 
-            <div className="space-y-2">
-              <Label>Monto del Pool (USD)</Label>
-              <Input
-                type="number"
-                step="any"
-                value={form.poolAmount}
-                onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
-                required
-                className="bg-muted border-border text-foreground"
+            <Separator />
+
+            {/* ── Section 3: Protection ── */}
+            <section className="space-y-4">
+              <SectionHeader
+                title="Protección"
+                description="Configuración del hedge en Hyperliquid"
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label>Nombre (opcional)</Label>
-              <Input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="bg-muted border-border text-foreground"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Apalancamiento</Label>
-                <Select
-                  value={form.leverage.toString()}
-                  onValueChange={(value) => setForm((f) => ({ ...f, leverage: parseInt(value) }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10x</SelectItem>
-                    <SelectItem value="20">20x</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Apalancamiento</Label>
+                  <Select
+                    value={form.leverage.toString()}
+                    onValueChange={(value) =>
+                      setForm((f) => ({ ...f, leverage: parseInt(value) }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10x</SelectItem>
+                      <SelectItem value="20">20x</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Dirección de Protección</Label>
+                  <Select
+                    value={form.protectionDirection}
+                    onValueChange={(value) =>
+                      setForm((f) => ({
+                        ...f,
+                        protectionDirection: value as 'below' | 'above' | 'both',
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="below">Solo abajo (Short)</SelectItem>
+                      <SelectItem value="above">Solo arriba (Long)</SelectItem>
+                      <SelectItem value="both">Ambas direcciones</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label>Dirección de Protección</Label>
+                <Label>Wallet de Protección</Label>
                 <Select
-                  value={form.protectionDirection}
+                  value={form.protectionWalletId}
                   onValueChange={(value) =>
-                    setForm((f) => ({
-                      ...f,
-                      protectionDirection: value as 'below' | 'above' | 'both',
-                    }))
+                    setForm((f) => ({ ...f, protectionWalletId: value }))
                   }
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Seleccionar wallet…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="below">Solo abajo (Short)</SelectItem>
-                    <SelectItem value="above">Solo arriba (Long)</SelectItem>
-                    <SelectItem value="both">Ambas direcciones</SelectItem>
+                    {protectionWallets.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.alias}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Wallet de Protección</Label>
-              <Select
-                value={form.protectionWalletId}
-                onValueChange={(value) => setForm((f) => ({ ...f, protectionWalletId: value }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar wallet\u2026" />
-                </SelectTrigger>
-                <SelectContent>
-                  {protectionWallets.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.alias}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="profit-wallet"
-                  checked={form.profitWalletEnabled}
-                  onCheckedChange={(checked) =>
-                    setForm((f) => ({ ...f, profitWalletEnabled: checked }))
-                  }
-                />
-                <Label htmlFor="profit-wallet" className="cursor-pointer">
-                  Replicar en wallet de ganancia
-                </Label>
+              <div className="flex items-center gap-6 pt-1">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="protection-active"
+                    checked={form.protectionActive}
+                    onCheckedChange={(checked) =>
+                      setForm((f) => ({ ...f, protectionActive: checked }))
+                    }
+                  />
+                  <Label htmlFor="protection-active" className="cursor-pointer">
+                    Protección activa
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="profit-wallet"
+                    checked={form.profitWalletEnabled}
+                    onCheckedChange={(checked) =>
+                      setForm((f) => ({ ...f, profitWalletEnabled: checked }))
+                    }
+                  />
+                  <Label htmlFor="profit-wallet" className="cursor-pointer">
+                    Replicar en wallet de ganancia
+                  </Label>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="protection-active"
-                  checked={form.protectionActive}
-                  onCheckedChange={(checked) =>
-                    setForm((f) => ({ ...f, protectionActive: checked }))
-                  }
-                />
-                <Label htmlFor="protection-active" className="cursor-pointer">
-                  Protección activa
-                </Label>
-              </div>
-            </div>
+            </section>
 
-            {/* Range Trading Config (R10) */}
-            <div className="border-t border-border pt-6 mt-6">
-              <div className="flex items-center justify-between mb-4">
+            <Separator />
+
+            {/* ── Section 4: Fine Tuning ── */}
+            <section className="space-y-4">
+              <SectionHeader
+                title="Ajuste Fino"
+                description="Parámetros avanzados para el comportamiento del hedge"
+              />
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Ratio de Hedge</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="2.0"
+                    value={form.hedgeRatio}
+                    onChange={(e) => setForm((f) => ({ ...f, hedgeRatio: e.target.value }))}
+                    className="bg-muted border-border text-foreground"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    0.5 = mitad, 1.0 = completo, 2.0 = doble
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Debounce (ticks)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="20"
+                    value={form.debounceCount}
+                    onChange={(e) => setForm((f) => ({ ...f, debounceCount: e.target.value }))}
+                    className="bg-muted border-border text-foreground"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Ticks consecutivos para confirmar salida
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Cooldown (seg)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={form.hedgeCooldownSeconds}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, hedgeCooldownSeconds: e.target.value }))
+                    }
+                    className="bg-muted border-border text-foreground"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Espera post-cierre antes de nuevo hedge
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* ── Section 5: Range Trading (R10) ── */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">Trading dentro del Rango</h3>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Trading dentro del Rango
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Opera mean-reversion dentro del rango LP (long abajo, short arriba)
                   </p>
@@ -399,7 +531,7 @@ export default function EditPoolPage() {
               </div>
 
               {form.tradingEnabled && (
-                <div className="space-y-4">
+                <div className="space-y-4 pt-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Apalancamiento Trading</Label>
@@ -502,11 +634,13 @@ export default function EditPoolPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </section>
+
+            <Separator />
 
             <div className="flex gap-3">
               <Button type="submit" className="flex-1" disabled={submitting}>
-                {submitting ? 'Guardando\u2026' : 'Guardar Cambios'}
+                {submitting ? 'Guardando…' : 'Guardar Cambios'}
               </Button>
               <Button type="button" variant="secondary" onClick={() => router.back()}>
                 Cancelar
