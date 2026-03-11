@@ -368,7 +368,7 @@ async function main() {
 
     // Add newly activated pools
     for (const pool of activePools) {
-      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}`;
+      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}:${pool.tradingEnabled}:${pool.tradingEntryZonePercent}:${pool.tradingCooldownSeconds}`;
 
       if (!watchedPoolIds.has(pool.id)) {
         rangeDetector.register(pool);

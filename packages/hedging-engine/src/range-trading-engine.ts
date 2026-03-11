@@ -66,13 +66,26 @@ export class RangeTradingEngine {
 
   /** Update config (e.g., user edited pool) */
   updateConfig(config: PoolConfig): void {
-    this.entryDetector.updateConfig(
-      config.id,
-      config.rangeLower,
-      config.rangeUpper,
-      config.tradingEntryZonePercent,
-      config.tradingCooldownSeconds,
-    );
+    const isTracked = this.entryDetector.getZone(config.id) !== undefined;
+
+    if (config.tradingEnabled && !isTracked) {
+      // Trading was just enabled — register for the first time
+      this.entryDetector.register(config);
+      logger.info({ configId: config.id }, 'Pool registered for range trading (live update)');
+    } else if (!config.tradingEnabled && isTracked) {
+      // Trading was just disabled — unregister
+      this.entryDetector.unregister(config.id);
+      logger.info({ configId: config.id }, 'Pool unregistered from range trading (disabled)');
+    } else if (config.tradingEnabled && isTracked) {
+      // Already tracked — update parameters
+      this.entryDetector.updateConfig(
+        config.id,
+        config.rangeLower,
+        config.rangeUpper,
+        config.tradingEntryZonePercent,
+        config.tradingCooldownSeconds,
+      );
+    }
   }
 
   /** Process a price update — feeds both entry zone detector and trailing stop */
