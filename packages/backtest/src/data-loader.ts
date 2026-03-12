@@ -191,23 +191,137 @@ export async function fetchBybitKlines(
 }
 
 /**
- * Fetch klines trying Binance first, falling back to Bybit on geo-restriction.
+ * Fetch 1-minute klines from CryptoCompare (data aggregator, no geo-restrictions).
+ * Used as final fallback when both Binance and Bybit are blocked.
+ *
+ * @param symbol - e.g. 'ETHUSDT' (we split into fsym/tsym)
+ */
+export async function fetchCryptoCompareKlines(
+  symbol: string,
+  startTime: number,
+  endTime: number,
+): Promise<PriceCandle[]> {
+  // Parse symbol: ETHUSDT → fsym=ETH, tsym=USDT
+  const match = symbol.match(/^([A-Z]+)(USDT|USDC|USD|BTC)$/);
+  if (!match) {
+    throw new Error(`Cannot parse symbol for CryptoCompare: ${symbol}`);
+  }
+  const [, fsym, tsym] = match;
+
+  const candles: PriceCandle[] = [];
+  const baseUrl = 'https://min-api.cryptocompare.com/data/v2/histominute';
+  let cursor = Math.floor(endTime / 1000); // CryptoCompare uses seconds
+
+  const startSec = Math.floor(startTime / 1000);
+
+  while (cursor > startSec) {
+    // Max 2000 per request
+    const url = `${baseUrl}?fsym=${fsym}&tsym=${tsym}&limit=2000&toTs=${cursor}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`CryptoCompare API error ${response.status}: ${await response.text()}`);
+    }
+
+    const json = (await response.json()) as {
+      Response: string;
+      Message: string;
+      Data: {
+        Data: Array<{
+          time: number;
+          open: number;
+          high: number;
+          low: number;
+          close: number;
+          volumefrom: number;
+        }>;
+      };
+    };
+
+    if (json.Response === 'Error') {
+      throw new Error(`CryptoCompare API error: ${json.Message}`);
+    }
+
+    const data = json.Data.Data;
+    if (data.length === 0) break;
+
+    // Filter to our desired range and convert to ms timestamps
+    for (const k of data) {
+      const tsMs = k.time * 1000;
+      if (tsMs >= startTime && tsMs <= endTime && k.close > 0) {
+        candles.push({
+          timestamp: tsMs,
+          open: k.open,
+          high: k.high,
+          low: k.low,
+          close: k.close,
+          volume: k.volumefrom,
+        });
+      }
+    }
+
+    // Move cursor to before the oldest candle in this batch
+    const oldestTs = data[0].time;
+    if (oldestTs >= cursor) break; // No progress
+    cursor = oldestTs - 1;
+
+    logger.info(
+      { fetched: data.length, total: candles.length, remaining: Math.ceil((cursor - startSec) / 60) },
+      'Fetching CryptoCompare klines',
+    );
+
+    // Rate limit: ~50 req/second on free tier, be conservative
+    if (cursor > startSec) {
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+
+  // Sort chronologically and deduplicate
+  candles.sort((a, b) => a.timestamp - b.timestamp);
+  const seen = new Set<number>();
+  const deduped = candles.filter((c) => {
+    if (seen.has(c.timestamp)) return false;
+    seen.add(c.timestamp);
+    return true;
+  });
+
+  logger.info({ symbol, candles: deduped.length }, 'CryptoCompare klines loaded');
+  return deduped;
+}
+
+/**
+ * Fetch klines trying Binance → Bybit → CryptoCompare.
+ * Each fallback triggers on geo-restriction errors.
  */
 async function fetchKlines(
   symbol: string,
   startTime: number,
   endTime: number,
 ): Promise<PriceCandle[]> {
+  // Try Binance first
   try {
     return await fetchBinanceKlines(symbol, startTime, endTime);
   } catch (err) {
     const msg = err instanceof Error ? err.message : '';
-    if (msg.includes('451') || msg.includes('restricted location')) {
-      logger.warn('Binance geo-restricted, falling back to Bybit');
-      return fetchBybitKlines(symbol, startTime, endTime);
+    if (!msg.includes('451') && !msg.includes('restricted location')) {
+      throw err;
     }
-    throw err;
+    logger.warn('Binance geo-restricted, trying Bybit');
   }
+
+  // Try Bybit
+  try {
+    return await fetchBybitKlines(symbol, startTime, endTime);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (!msg.includes('403') && !msg.includes('block access')) {
+      throw err;
+    }
+    logger.warn('Bybit geo-restricted, falling back to CryptoCompare');
+  }
+
+  // Final fallback: CryptoCompare (no geo-restrictions)
+  return fetchCryptoCompareKlines(symbol, startTime, endTime);
 }
 
 /**

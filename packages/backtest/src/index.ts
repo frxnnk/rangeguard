@@ -1,4 +1,4 @@
-export { loadCSV, fetchBinanceKlines, fetchBybitKlines, fetchBinanceKlinesCached, candlesToPrices, parsePeriod } from './data-loader.js';
+export { loadCSV, fetchBinanceKlines, fetchBybitKlines, fetchCryptoCompareKlines, fetchBinanceKlinesCached, candlesToPrices, parsePeriod } from './data-loader.js';
 export type { PriceCandle, PricePoint } from './data-loader.js';
 export { runBacktest } from './orchestrator.js';
 export type { BacktestConfig, BacktestResult } from './orchestrator.js';
