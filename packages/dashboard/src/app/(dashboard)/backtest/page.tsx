@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -60,16 +60,7 @@ import {
 /* ─── constants ─── */
 
 const PAIRS = ['ETH/USDC', 'BTC/USDC', 'SOL/USDC', 'ARB/USDC', 'LINK/USDC'];
-const PERIODS = [
-  { value: '3d', label: '3 días' },
-  { value: '1w', label: '1 semana' },
-  { value: '2w', label: '2 semanas' },
-  { value: '1m', label: '1 mes' },
-  { value: '2m', label: '2 meses' },
-  { value: '3m', label: '3 meses' },
-  { value: '6m', label: '6 meses' },
-  { value: 'custom', label: 'Fechas personalizadas' },
-];
+
 
 interface Preset {
   name: string;
@@ -355,7 +346,7 @@ export default function BacktestPage() {
   const [pair, setPair] = useState('ETH/USDC');
   const [rangeLower, setRangeLower] = useState('');
   const [rangeUpper, setRangeUpper] = useState('');
-  const [period, setPeriod] = useState('1w');
+  const [period, setPeriod] = useState('custom');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [poolAmountUsd, setPoolAmountUsd] = useState('10000');
@@ -377,6 +368,14 @@ export default function BacktestPage() {
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to results when backtest completes
+  useEffect(() => {
+    if (result && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [result]);
 
   const applyPreset = (preset: Preset) => {
     setPair(preset.pair);
@@ -504,7 +503,7 @@ export default function BacktestPage() {
             {/* Section: Mercado */}
             <div>
               <SectionLabel>Mercado</SectionLabel>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 max-w-3xl">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-3 max-w-4xl">
                 <FieldGroup label="Par">
                   <Select value={pair} onValueChange={setPair}>
                     <SelectTrigger>
@@ -541,42 +540,23 @@ export default function BacktestPage() {
                     className="tabular-nums"
                   />
                 </FieldGroup>
-                <FieldGroup label="Período">
-                  <Select value={period} onValueChange={setPeriod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERIODS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <FieldGroup label="Fecha inicio">
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
+                  />
+                </FieldGroup>
+                <FieldGroup label="Fecha fin">
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                  />
                 </FieldGroup>
               </div>
-              {/* Custom dates */}
-              {period === 'custom' && (
-                <div className="grid grid-cols-2 gap-4 mt-3 max-w-md">
-                  <FieldGroup label="Fecha inicio">
-                    <Input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      required
-                    />
-                  </FieldGroup>
-                  <FieldGroup label="Fecha fin">
-                    <Input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      required
-                    />
-                  </FieldGroup>
-                </div>
-              )}
             </div>
 
             {/* Section: Parámetros */}
@@ -766,6 +746,7 @@ export default function BacktestPage() {
       {loading && <LoadingCard />}
 
       {/* ─── Results ─── */}
+      <div ref={resultsRef} />
       {result && <BacktestResults result={result} tradingEnabled={tradingEnabled} />}
 
       {/* ─── Findings card ─── */}
