@@ -5,6 +5,7 @@ import { EntryZoneDetector, type EntrySignal } from './entry-zone-detector.js';
 import { TrailingStopManager, type TrailingStopTrigger } from './trailing-stop-manager.js';
 import { OrderExecutor } from './order-executor.js';
 import type { HyperliquidClient } from './hyperliquid-client.js';
+import type { CircuitBreaker } from './circuit-breaker.js';
 
 const logger = createLogger('range-trading');
 
@@ -31,6 +32,7 @@ export class RangeTradingEngine {
   private entryDetector: EntryZoneDetector;
   private trailingManager: TrailingStopManager;
   private callbacks: RangeTradeEventCallbacks;
+  private circuitBreaker?: CircuitBreaker;
 
   constructor(
     poolsRepo: PoolsRepository,
@@ -38,12 +40,14 @@ export class RangeTradingEngine {
     tradeLogRepo: TradeLogRepository,
     hlClient: HyperliquidClient,
     callbacks?: RangeTradeEventCallbacks,
+    circuitBreaker?: CircuitBreaker,
   ) {
     this.poolsRepo = poolsRepo;
     this.tradesRepo = tradesRepo;
     this.executor = new OrderExecutor(hlClient, tradeLogRepo);
     this.hlClient = hlClient;
     this.callbacks = callbacks ?? {};
+    this.circuitBreaker = circuitBreaker;
 
     this.entryDetector = new EntryZoneDetector((signal) => this.onEntrySignal(signal));
 
@@ -147,6 +151,15 @@ export class RangeTradingEngine {
       return;
     }
 
+    // Circuit breaker: skip if too many consecutive failures
+    if (this.circuitBreaker && !this.circuitBreaker.canExecute(config.id)) {
+      logger.warn(
+        { configId: config.id, state: this.circuitBreaker.getState(config.id) },
+        'Circuit breaker OPEN — skipping range trade entry',
+      );
+      return;
+    }
+
     // Calculate position size
     const sizeUsd = Math.min(config.tradingMaxSizeUsd, parseFloat(config.poolAmount) * 0.5);
     const sizeInAsset = sizeUsd / signal.currentPrice;
@@ -189,9 +202,12 @@ export class RangeTradingEngine {
       );
 
       if (!result.success) {
+        this.circuitBreaker?.recordFailure(config.id);
         logger.error({ configId: config.id, error: result.error }, 'Failed to open range trade');
         return;
       }
+
+      this.circuitBreaker?.recordSuccess(config.id);
 
       // Record in DB
       const trade = this.tradesRepo.create({

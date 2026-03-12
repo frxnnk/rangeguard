@@ -49,3 +49,39 @@ export const UNISWAP_V3_POOL_ABI = [
     outputs: [{ name: '', type: 'uint24' }],
   },
 ] as const;
+
+export const NONFUNGIBLE_POSITION_MANAGER_ADDRESS =
+  '0xC36442b4a4522E871399CD717aBDD847Ab11218F' as const;
+
+export const NONFUNGIBLE_POSITION_MANAGER_ABI = [
+  {
+    name: 'positions',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [
+      { name: 'nonce', type: 'uint96' },
+      { name: 'operator', type: 'address' },
+      { name: 'token0', type: 'address' },
+      { name: 'token1', type: 'address' },
+      { name: 'fee', type: 'uint24' },
+      { name: 'tickLower', type: 'int24' },
+      { name: 'tickUpper', type: 'int24' },
+      { name: 'liquidity', type: 'uint128' },
+      { name: 'feeGrowthInside0LastX128', type: 'uint256' },
+      { name: 'feeGrowthInside1LastX128', type: 'uint256' },
+      { name: 'tokensOwed0', type: 'uint128' },
+      { name: 'tokensOwed1', type: 'uint128' },
+    ],
+  },
+] as const;
+
+export const ERC20_DECIMALS_ABI = [
+  {
+    name: 'decimals',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
+] as const;

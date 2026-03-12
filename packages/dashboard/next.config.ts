@@ -1,7 +1,14 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@rangeguard/common', '@rangeguard/db', '@rangeguard/security'],
+  transpilePackages: [
+    '@rangeguard/common',
+    '@rangeguard/db',
+    '@rangeguard/backtest',
+    '@rangeguard/hedging-engine',
+    '@rangeguard/pool-monitor',
+    '@rangeguard/security',
+  ],
   serverExternalPackages: ['better-sqlite3'],
   webpack: (config, { isServer }) => {
     config.resolve.extensionAlias = {

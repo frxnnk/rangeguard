@@ -17,6 +17,7 @@ import { OrderExecutor } from './order-executor.js';
 import { PositionTracker } from './position-tracker.js';
 import { StopLossManager } from './stop-loss-manager.js';
 import type { HyperliquidClient } from './hyperliquid-client.js';
+import type { CircuitBreaker } from './circuit-breaker.js';
 
 const logger = createLogger('engine');
 
@@ -41,6 +42,7 @@ export class HedgingEngine {
   private hlClient: HyperliquidClient;
   private callbacks: HedgeEventCallbacks;
   private rangeTradingBridge?: RangeTradingBridge;
+  private circuitBreaker?: CircuitBreaker;
 
   constructor(
     poolsRepo: PoolsRepository,
@@ -50,6 +52,7 @@ export class HedgingEngine {
     hlClient: HyperliquidClient,
     callbacks?: HedgeEventCallbacks,
     slRepo?: StopLossRepository,
+    circuitBreaker?: CircuitBreaker,
   ) {
     this.poolsRepo = poolsRepo;
     this.walletsRepo = walletsRepo;
@@ -59,6 +62,7 @@ export class HedgingEngine {
     this.slManager = new StopLossManager(hlClient, slRepo);
     this.hlClient = hlClient;
     this.callbacks = callbacks ?? {};
+    this.circuitBreaker = circuitBreaker;
   }
 
   /** Set the range trading bridge for mutual exclusion */
@@ -90,6 +94,15 @@ export class HedgingEngine {
       logger.warn(
         { poolConfigId: config.id, walletId: config.protectionWalletId },
         'Protection wallet has no private key loaded — skipping hedge. Run "pnpm setup-keys" to configure.',
+      );
+      return;
+    }
+
+    // Circuit breaker: skip if too many consecutive failures
+    if (this.circuitBreaker && !this.circuitBreaker.canExecute(config.id)) {
+      logger.warn(
+        { poolConfigId: config.id, state: this.circuitBreaker.getState(config.id) },
+        'Circuit breaker OPEN — skipping hedge open',
       );
       return;
     }
@@ -126,6 +139,13 @@ export class HedgingEngine {
 
     // Execute orders
     const result = await this.executor.openHedge(config, params, profitWallet?.id);
+
+    // Record circuit breaker outcome
+    if (result.protectionOrder.success) {
+      this.circuitBreaker?.recordSuccess(config.id);
+    } else {
+      this.circuitBreaker?.recordFailure(config.id);
+    }
 
     // Record in DB + emit events + place backup SL
     if (result.protectionOrder.success) {

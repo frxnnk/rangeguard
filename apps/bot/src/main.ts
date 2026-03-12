@@ -28,6 +28,7 @@ import {
   DryRunClient,
   WalletMonitor,
   RangeTradingEngine,
+  CircuitBreaker,
 } from '@rangeguard/hedging-engine';
 import { TypedEventBus } from './event-bus.js';
 import { loadConfig, applyDbOverrides, monorepoRoot } from './config.js';
@@ -181,7 +182,10 @@ async function main() {
     }
   }
 
-  // 8. Initialize hedging engine with event callbacks
+  // 8. Initialize circuit breaker (shared between hedge + range trading engines)
+  const circuitBreaker = new CircuitBreaker();
+
+  // Initialize hedging engine with event callbacks
   const engine = new HedgingEngine(
     poolsRepo,
     walletsRepo,
@@ -193,6 +197,7 @@ async function main() {
       onHedgeClosed: (event) => eventBus.emit('hedge-closed', event),
     },
     slRepo,
+    circuitBreaker,
   );
 
   // 8b. Initialize range trading engine (R10) with mutual exclusion
@@ -205,6 +210,7 @@ async function main() {
       onTradeOpened: (event) => eventBus.emit('range-trade-opened', event),
       onTradeClosed: (event) => eventBus.emit('range-trade-closed', event),
     },
+    circuitBreaker,
   );
 
   // Wire mutual exclusion: hedge engine closes range trades before opening hedge

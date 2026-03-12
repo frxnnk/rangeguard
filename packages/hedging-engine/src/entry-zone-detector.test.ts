@@ -34,6 +34,7 @@ function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
     tradingEntryZonePercent: 25,
     tradingCooldownSeconds: 300,
     tradingMaxSizeUsd: 1000,
+    poolAmountSource: 'manual',
     ...overrides,
   };
 }

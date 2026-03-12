@@ -10,8 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@rangeguard/backtest": "workspace:*",
     "@rangeguard/common": "workspace:*",
     "@rangeguard/db": "workspace:*",
+    "@rangeguard/hedging-engine": "workspace:*",
+    "@rangeguard/pool-monitor": "workspace:*",
     "@rangeguard/security": "workspace:*",
     "@tanstack/react-query": "^5.67.0",
     "class-variance-authority": "^0.7.1",

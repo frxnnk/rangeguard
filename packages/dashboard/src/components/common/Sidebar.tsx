@@ -15,6 +15,7 @@ import {
   Info,
   Menu,
   LogOut,
+  FlaskConical,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -24,6 +25,7 @@ const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
   { href: '/wallets', label: 'Billeteras', icon: Wallet },
   { href: '/hedges', label: 'Coberturas', icon: Shield },
   { href: '/history', label: 'Historial', icon: Clock },
+  { href: '/backtest', label: 'Backtest', icon: FlaskConical },
   { href: '/logs', label: 'Logs', icon: ScrollText },
   { href: '/settings', label: 'Configuración', icon: Settings },
   { href: '/about', label: 'Acerca de', icon: Info },

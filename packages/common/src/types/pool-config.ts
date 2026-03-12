@@ -34,6 +34,11 @@ export interface PoolConfig {
   createdAt: number;
   updatedAt: number;
 
+  // LP position reading
+  lpTokenId?: string; // NFT tokenId (string for BigInt compatibility)
+  poolAmountSource: 'manual' | 'on-chain'; // default 'manual'
+  poolAmountSyncedAt?: number; // timestamp of last on-chain sync
+
   // Range trading config (R10)
   tradingEnabled: boolean;
   tradingLeverage: number;
@@ -65,6 +70,10 @@ export interface CreatePoolConfig {
   hedgeCooldownSeconds?: number; // default 300
   debounceCount?: number; // default 3
   protectionActive: boolean;
+
+  // LP position reading
+  lpTokenId?: string;
+  poolAmountSource?: 'manual' | 'on-chain';
 
   // Range trading config (R10) — all optional, defaults applied in DB
   tradingEnabled?: boolean;

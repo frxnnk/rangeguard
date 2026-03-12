@@ -65,7 +65,11 @@ export default function AboutPage() {
           <Li done>Bot de mean-reversion dentro del rango del LP</Li>
           <Li done>Detector de zonas de entrada (estado máquina con debounce)</Li>
           <Li done>Trailing stop dinámico con persistencia en DB</Li>
-          <Li done>Exclusión mutua: hedge siempre tiene prioridad sobre trading</Li>
+          <Li done>
+            Si el precio sale del rango con un trade abierto, el bot cierra el trade
+            automáticamente y abre el hedge — la protección del pool siempre tiene prioridad
+          </Li>
+          <Li done>Wallet compartida entre trading y hedge (bloqueo mutuo, nunca operan al mismo tiempo)</Li>
           <Li done>7 parámetros configurables por pool (leverage, SL%, trailing%, zona de entrada, etc.)</Li>
         </ul>
 
