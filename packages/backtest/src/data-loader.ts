@@ -210,13 +210,15 @@ export async function fetchCryptoCompareKlines(
 
   const candles: PriceCandle[] = [];
   const baseUrl = 'https://min-api.cryptocompare.com/data/v2/histominute';
+  const apiKey = process.env.CRYPTOCOMPARE_API_KEY || '';
+  const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
   let cursor = Math.floor(endTime / 1000); // CryptoCompare uses seconds
 
   const startSec = Math.floor(startTime / 1000);
 
   while (cursor > startSec) {
     // Max 2000 per request
-    const url = `${baseUrl}?fsym=${fsym}&tsym=${tsym}&limit=2000&toTs=${cursor}`;
+    const url = `${baseUrl}?fsym=${fsym}&tsym=${tsym}&limit=2000&toTs=${cursor}${apiKeyParam}`;
 
     const response = await fetch(url);
     if (!response.ok) {

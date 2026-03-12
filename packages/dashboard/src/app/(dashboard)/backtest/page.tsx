@@ -1694,11 +1694,12 @@ function FindingsCard({ result }: { result: BacktestResult }) {
   const findings: Array<{ type: 'positive' | 'warning' | 'neutral' | 'solution'; text: string }> = [];
 
   // ── Analyze trade patterns ──
-  // Detect upward breakout losses: shorts where exitPrice > entryPrice (price went up)
-  const upsideShorts = hedgeTrades.filter((t) => t.side === 'short' && t.exitPrice > t.entryPrice);
-  const upsideLoss = upsideShorts.reduce((s, t) => s + t.pnl, 0);
-  const downsideShorts = hedgeTrades.filter((t) => t.side === 'short' && t.exitPrice <= t.entryPrice);
-  const downsideGain = downsideShorts.reduce((s, t) => s + t.pnl, 0);
+  // Upward breakout trades: longs opened when price goes above range (unnecessary — LP is 100% stablecoin)
+  const upsideTrades = hedgeTrades.filter((t) => t.side === 'long');
+  const upsidePnl = upsideTrades.reduce((s, t) => s + t.pnl, 0);
+  // Downward breakout trades: shorts opened when price drops below range (actual hedging)
+  const downsideTrades = hedgeTrades.filter((t) => t.side === 'short');
+  const downsidePnl = downsideTrades.reduce((s, t) => s + t.pnl, 0);
 
   // No trades at all
   if (combinedStats.totalTrades === 0) {
@@ -1746,23 +1747,27 @@ function FindingsCard({ result }: { result: BacktestResult }) {
   }
 
   // ── Detect upward breakout problem ──
-  if (upsideShorts.length > 0 && upsideLoss < -10) {
-    const pctUpside = ((upsideShorts.length / hedgeTrades.length) * 100).toFixed(0);
-    findings.push({
-      type: 'warning',
-      text: `${upsideShorts.length} cobertura(s) abrieron short contra una suba (${pctUpside}% de los trades). Pérdida por shorts al alza: ${fmtUsd(upsideLoss)}.`,
-    });
-    findings.push({
-      type: 'solution',
-      text: `Solución: Configurar cobertura "solo hacia abajo". Cuando el precio sube arriba del rango, el LP ya está 100% en stablecoin — no hay exposición que cubrir. Shortear una suba no es cobertura, es especulación.`,
-    });
-    // Estimate savings
-    if (downsideGain > 0) {
-      const hypothetical = downsideGain + upsideLoss;
+  // When price goes above range, LP is 100% stablecoin — opening longs is unnecessary
+  if (upsideTrades.length > 0 && hedgeTrades.length > 0) {
+    const pctUpside = ((upsideTrades.length / hedgeTrades.length) * 100).toFixed(0);
+    const upsideFees = upsideTrades.reduce((s, t) => s + t.fees, 0);
+    const upsideNet = upsidePnl - upsideFees;
+    if (upsideNet < -10 || Number(pctUpside) > 50) {
+      findings.push({
+        type: 'warning',
+        text: `${upsideTrades.length} cobertura(s) abrieron long en ruptura al alza (${pctUpside}% de los trades). Resultado neto: ${fmtUsd(upsideNet)}.`,
+      });
       findings.push({
         type: 'solution',
-        text: `Si solo se hubieran ejecutado las coberturas hacia abajo: PnL hedge ${fmtUsd(downsideGain)} en vez de ${fmtUsd(downsideGain + upsideLoss)}. Ahorro estimado: ${fmtUsdNeutral(Math.abs(upsideLoss))}.`,
+        text: `Solución: Configurar cobertura "solo hacia abajo". Cuando el precio sube arriba del rango, el LP ya está 100% en stablecoin — no hay exposición que cubrir. Operar en rupturas al alza no es cobertura, es especulación.`,
       });
+      // Estimate savings
+      if (downsideTrades.length > 0) {
+        findings.push({
+          type: 'solution',
+          text: `Si solo se hubieran ejecutado coberturas hacia abajo: PnL hedge ${fmtUsd(downsidePnl)} vs actual ${fmtUsd(downsidePnl + upsidePnl)}. Ahorro estimado: ${fmtUsdNeutral(Math.abs(upsideNet))}.`,
+        });
+      }
     }
   }
 
