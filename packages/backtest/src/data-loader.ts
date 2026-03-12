@@ -59,7 +59,7 @@ export function loadCSV(filePath: string): PriceCandle[] {
  * Fetch 1-minute klines from Binance public API.
  * Paginated automatically (max 1000 per request).
  *
- * @param symbol - e.g. 'ETHUSDC'
+ * @param symbol - e.g. 'ETHUSDT'
  * @param startTime - Unix ms
  * @param endTime - Unix ms
  */
@@ -113,8 +113,106 @@ export async function fetchBinanceKlines(
 }
 
 /**
+ * Fetch 1-minute klines from Bybit V5 public API.
+ * Used as fallback when Binance is geo-restricted (HTTP 451).
+ * Results come in reverse order — we reverse them to match Binance's chronological order.
+ */
+export async function fetchBybitKlines(
+  symbol: string,
+  startTime: number,
+  endTime: number,
+): Promise<PriceCandle[]> {
+  const candles: PriceCandle[] = [];
+  let cursor = endTime;
+  const baseUrl = 'https://api.bybit.com/v5/market/kline';
+
+  while (cursor > startTime) {
+    const url = `${baseUrl}?category=spot&symbol=${symbol}&interval=1&start=${startTime}&end=${cursor}&limit=1000`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Bybit API error ${response.status}: ${await response.text()}`);
+    }
+
+    const json = (await response.json()) as {
+      retCode: number;
+      retMsg: string;
+      result: { list: string[][] };
+    };
+
+    if (json.retCode !== 0) {
+      throw new Error(`Bybit API error: ${json.retMsg}`);
+    }
+
+    const data = json.result.list;
+    if (data.length === 0) break;
+
+    // Bybit returns newest-first — collect and we'll sort at the end
+    for (const k of data) {
+      candles.push({
+        timestamp: parseInt(k[0]),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5]),
+      });
+    }
+
+    // Move cursor to before the oldest candle in this batch
+    const oldestTs = parseInt(data[data.length - 1][0]);
+    if (oldestTs >= cursor) break; // No progress, avoid infinite loop
+    cursor = oldestTs - 1;
+
+    logger.info(
+      { fetched: data.length, total: candles.length, remaining: Math.ceil((cursor - startTime) / 60_000) },
+      'Fetching Bybit klines',
+    );
+
+    // Rate limit: max 120 requests/min on Bybit
+    if (cursor > startTime) {
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+
+  // Sort chronologically (Bybit returns reverse order, and we paginated backwards)
+  candles.sort((a, b) => a.timestamp - b.timestamp);
+
+  // Deduplicate by timestamp (overlapping pages may produce dupes)
+  const seen = new Set<number>();
+  const deduped = candles.filter((c) => {
+    if (seen.has(c.timestamp)) return false;
+    seen.add(c.timestamp);
+    return true;
+  });
+
+  logger.info({ symbol, candles: deduped.length }, 'Bybit klines loaded');
+  return deduped;
+}
+
+/**
+ * Fetch klines trying Binance first, falling back to Bybit on geo-restriction.
+ */
+async function fetchKlines(
+  symbol: string,
+  startTime: number,
+  endTime: number,
+): Promise<PriceCandle[]> {
+  try {
+    return await fetchBinanceKlines(symbol, startTime, endTime);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg.includes('451') || msg.includes('restricted location')) {
+      logger.warn('Binance geo-restricted, falling back to Bybit');
+      return fetchBybitKlines(symbol, startTime, endTime);
+    }
+    throw err;
+  }
+}
+
+/**
  * Fetch klines with automatic CSV caching.
- * If cached file exists, loads from disk. Otherwise fetches and saves.
+ * If cached file exists, loads from disk. Otherwise fetches (Binance → Bybit fallback) and saves.
  */
 export async function fetchBinanceKlinesCached(
   symbol: string,
@@ -132,8 +230,8 @@ export async function fetchBinanceKlinesCached(
     return loadCSV(cacheFile);
   }
 
-  // Fetch from Binance
-  const candles = await fetchBinanceKlines(symbol, startTime, endTime);
+  // Fetch from Binance (with Bybit fallback)
+  const candles = await fetchKlines(symbol, startTime, endTime);
 
   // Save to cache
   mkdirSync(dirname(cacheFile), { recursive: true });
