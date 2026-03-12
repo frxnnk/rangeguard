@@ -19,23 +19,37 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-const ALL_NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
-  { href: '/', label: 'Resumen', icon: LayoutGrid },
-  { href: '/pools', label: 'Pools', icon: Layers },
-  { href: '/wallets', label: 'Billeteras', icon: Wallet },
-  { href: '/hedges', label: 'Coberturas', icon: Shield },
-  { href: '/history', label: 'Historial', icon: Clock },
-  { href: '/backtest', label: 'Backtest', icon: FlaskConical },
-  { href: '/logs', label: 'Logs', icon: ScrollText },
-  { href: '/settings', label: 'Configuración', icon: Settings },
-  { href: '/about', label: 'Acerca de', icon: Info },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: ElementType;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Simulación',
+    items: [{ href: '/backtest', label: 'Backtest', icon: FlaskConical }],
+  },
+  {
+    title: 'Operaciones',
+    items: [
+      { href: '/', label: 'Resumen', icon: LayoutGrid },
+      { href: '/pools', label: 'Pools', icon: Layers },
+      { href: '/wallets', label: 'Billeteras', icon: Wallet },
+      { href: '/hedges', label: 'Coberturas', icon: Shield },
+      { href: '/history', label: 'Historial', icon: Clock },
+      { href: '/logs', label: 'Logs', icon: ScrollText },
+      { href: '/settings', label: 'Configuración', icon: Settings },
+    ],
+  },
 ];
 
-const isBacktestOnly = process.env.NEXT_PUBLIC_BACKTEST_ONLY === 'true';
-
-const NAV_ITEMS = isBacktestOnly
-  ? ALL_NAV_ITEMS.filter((item) => ['/backtest', '/about'].includes(item.href))
-  : ALL_NAV_ITEMS;
+const BOTTOM_ITEM: NavItem = { href: '/about', label: 'Acerca de', icon: Info };
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -66,53 +80,74 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <p className="text-xs text-muted-foreground mt-1">Cobertura de Pools de Liquidez</p>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onNavigate}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-sidebar-primary/20 text-sidebar-primary'
-                  : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
-              }`}
-            >
-              <Icon className="size-5" aria-hidden="true" />
-              {label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title}>
+            <span className="px-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+              {section.title}
+            </span>
+            <div className="mt-1.5 space-y-0.5">
+              {section.items.map(({ href, label, icon: Icon }) => {
+                const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onNavigate}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-sidebar-primary/20 text-sidebar-primary'
+                        : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+                    }`}
+                  >
+                    <Icon className="size-4" aria-hidden="true" />
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Bottom standalone link */}
+        <div className="pt-2">
+          <Link
+            href={BOTTOM_ITEM.href}
+            onClick={onNavigate}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              pathname.startsWith(BOTTOM_ITEM.href)
+                ? 'bg-sidebar-primary/20 text-sidebar-primary'
+                : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'
+            }`}
+          >
+            <BOTTOM_ITEM.icon className="size-4" aria-hidden="true" />
+            {BOTTOM_ITEM.label}
+          </Link>
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
-        {!isBacktestOnly && (
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-              }`}
-            />
-            <span className="text-xs text-muted-foreground">
-              {isRunning ? 'Bot Activo' : 'Bot Inactivo'}
-            </span>
-          </div>
-        )}
-        {!isBacktestOnly && (
-          <button
-            onClick={async () => {
-              await fetch('/api/auth', { method: 'DELETE' });
-              router.push('/login');
-              router.refresh();
-            }}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
-          >
-            <LogOut className="size-3.5" />
-            Cerrar sesión
-          </button>
-        )}
+      <div className="p-4 border-t border-sidebar-border space-y-2">
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              isRunning ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'
+            }`}
+          />
+          <span className="text-xs text-muted-foreground">
+            {isRunning ? 'Bot Activo' : 'Bot Inactivo'}
+          </span>
+        </div>
+        <button
+          onClick={async () => {
+            await fetch('/api/auth', { method: 'DELETE' });
+            router.push('/login');
+            router.refresh();
+          }}
+          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <LogOut className="size-3.5" />
+          Cerrar sesión
+        </button>
       </div>
     </>
   );

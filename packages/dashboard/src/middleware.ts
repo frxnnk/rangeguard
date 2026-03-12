@@ -3,8 +3,8 @@ import type { NextRequest } from 'next/server';
 
 const API_KEY = process.env.DASHBOARD_API_KEY;
 
-/** Routes that don't require auth */
-const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/bot-status'];
+/** Routes that never require auth */
+const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/bot-status', '/backtest', '/api/backtest', '/about'];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(route + '/'));
@@ -13,19 +13,10 @@ function isPublic(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Backtest-only mode: redirect root to /backtest, skip auth entirely
-  if (process.env.BACKTEST_ONLY === 'true') {
-    if (pathname === '/') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/backtest';
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
-
   // No API key configured → dev mode, allow everything
   if (!API_KEY) return NextResponse.next();
 
+  // Public routes (backtest, about, auth) — always accessible
   if (isPublic(pathname)) return NextResponse.next();
 
   // API routes: check x-api-key header OR auth cookie
