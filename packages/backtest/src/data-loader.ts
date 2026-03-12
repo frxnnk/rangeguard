@@ -1,4 +1,5 @@
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { resolve, dirname } from 'path';
 import { createLogger } from '@rangeguard/common';
 
 const logger = createLogger('data-loader');
@@ -108,6 +109,41 @@ export async function fetchBinanceKlines(
   }
 
   logger.info({ symbol, candles: candles.length }, 'Binance klines loaded');
+  return candles;
+}
+
+/**
+ * Fetch klines with automatic CSV caching.
+ * If cached file exists, loads from disk. Otherwise fetches and saves.
+ */
+export async function fetchBinanceKlinesCached(
+  symbol: string,
+  startTime: number,
+  endTime: number,
+  cacheDir: string = 'data/price-cache',
+): Promise<PriceCandle[]> {
+  // Generate cache key from symbol + date range (rounded to day)
+  const startDay = new Date(startTime).toISOString().split('T')[0];
+  const endDay = new Date(endTime).toISOString().split('T')[0];
+  const cacheFile = resolve(cacheDir, `${symbol}_${startDay}_${endDay}.csv`);
+
+  if (existsSync(cacheFile)) {
+    logger.info({ file: cacheFile }, 'Loading cached price data');
+    return loadCSV(cacheFile);
+  }
+
+  // Fetch from Binance
+  const candles = await fetchBinanceKlines(symbol, startTime, endTime);
+
+  // Save to cache
+  mkdirSync(dirname(cacheFile), { recursive: true });
+  const header = 'timestamp,open,high,low,close,volume';
+  const rows = candles.map(
+    (c) => `${c.timestamp},${c.open},${c.high},${c.low},${c.close},${c.volume}`,
+  );
+  writeFileSync(cacheFile, [header, ...rows].join('\n'), 'utf-8');
+  logger.info({ file: cacheFile, candles: candles.length }, 'Price data cached to CSV');
+
   return candles;
 }
 

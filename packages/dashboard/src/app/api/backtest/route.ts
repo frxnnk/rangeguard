@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
-  fetchBinanceKlines,
+  fetchBinanceKlinesCached,
   candlesToPrices,
   parsePeriod,
   runBacktest,
   analyze,
+  simulateLp,
+  analyzeUnified,
 } from '@rangeguard/backtest';
 import type { BacktestConfig } from '@rangeguard/backtest';
 
@@ -15,10 +17,10 @@ export async function POST(request: Request) {
     const body = await request.json();
 
     // Validate required fields
-    const { pair, rangeLower, rangeUpper, period } = body;
-    if (!pair || !rangeLower || !rangeUpper || !period) {
+    const { pair, rangeLower, rangeUpper, period, startDate, endDate } = body;
+    if (!pair || !rangeLower || !rangeUpper || (!period && (!startDate || !endDate))) {
       return NextResponse.json(
-        { error: 'Campos requeridos: pair, rangeLower, rangeUpper, period' },
+        { error: 'Campos requeridos: pair, rangeLower, rangeUpper, y period o startDate/endDate' },
         { status: 400 },
       );
     }
@@ -30,10 +32,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse period and fetch data from Binance
-    const { startTime, endTime } = parsePeriod(period);
-    const symbol = pair.replace('/', '');
-    const candles = await fetchBinanceKlines(symbol, startTime, endTime);
+    // Parse dates: absolute dates take priority over relative period
+    let startTime: number;
+    let endTime: number;
+    if (startDate && endDate) {
+      startTime = new Date(startDate).getTime();
+      endTime = new Date(endDate).getTime();
+      if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+        return NextResponse.json(
+          { error: 'Fechas inválidas: startDate debe ser anterior a endDate' },
+          { status: 400 },
+        );
+      }
+    } else {
+      ({ startTime, endTime } = parsePeriod(period));
+    }
+
+    const symbol = pair.replace('/', '').replace(/USDC$/, 'USDT');
+    const candles = await fetchBinanceKlinesCached(symbol, startTime, endTime);
 
     if (candles.length === 0) {
       return NextResponse.json(
@@ -75,11 +91,32 @@ export async function POST(request: Request) {
     const result = await runBacktest(prices, config);
     const durationMs = Date.now() - t0;
 
-    // Analyze
+    // Analyze hedge/range trades
     const allTrades = [...result.hedgeTrades, ...result.rangeTrades];
     const hedgeStats = analyze(result.hedgeTrades);
     const rangeStats = analyze(result.rangeTrades);
     const combinedStats = analyze(allTrades);
+
+    // Simulate LP position (IL + fees)
+    const feeAprPercent = Number(body.feeAprPercent) || 20;
+    const lpMetrics = simulateLp(
+      {
+        poolAmountUsd: config.poolAmountUsd,
+        rangeLower: config.rangeLower,
+        rangeUpper: config.rangeUpper,
+        entryPrice: prices[0].price,
+        feeAprPercent,
+      },
+      prices,
+    );
+
+    // Unified hedge vs IL analysis
+    const unifiedAnalysis = analyzeUnified(result.hedgeTrades, lpMetrics, prices, {
+      rangeLower: config.rangeLower,
+      rangeUpper: config.rangeUpper,
+      poolAmountUsd: config.poolAmountUsd,
+      entryPrice: prices[0].price,
+    });
 
     return NextResponse.json({
       config: result.config,
@@ -88,6 +125,8 @@ export async function POST(request: Request) {
       combinedStats,
       hedgeTrades: result.hedgeTrades,
       rangeTrades: result.rangeTrades,
+      lpMetrics,
+      unifiedAnalysis,
       startTime: result.startTime,
       endTime: result.endTime,
       pricePoints: result.pricePoints,

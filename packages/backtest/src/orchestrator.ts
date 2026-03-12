@@ -118,7 +118,11 @@ export async function runBacktest(
   (hlClient as unknown as DryRunClient).addWallet(wallet.id, 'backtest-wallet', 'fake-key');
 
   // Collect events
-  const hedgeEvents: Array<{ type: 'open' | 'close'; timestamp: number; data: Record<string, unknown> }> = [];
+  const hedgeEvents: Array<{
+    type: 'open' | 'close';
+    timestamp: number;
+    data: Record<string, unknown>;
+  }> = [];
 
   // Create hedging engine
   const engine = new HedgingEngine(
@@ -129,10 +133,18 @@ export async function runBacktest(
     hlClient,
     {
       onHedgeOpened: (event) => {
-        hedgeEvents.push({ type: 'open', timestamp: event.timestamp, data: event as unknown as Record<string, unknown> });
+        hedgeEvents.push({
+          type: 'open',
+          timestamp: event.timestamp,
+          data: event as unknown as Record<string, unknown>,
+        });
       },
       onHedgeClosed: (event) => {
-        hedgeEvents.push({ type: 'close', timestamp: event.timestamp, data: event as unknown as Record<string, unknown> });
+        hedgeEvents.push({
+          type: 'close',
+          timestamp: event.timestamp,
+          data: event as unknown as Record<string, unknown>,
+        });
       },
     },
     slRepo,
@@ -153,21 +165,26 @@ export async function runBacktest(
   // Wire mutual exclusion
   engine.setRangeTradingBridge(rangeTradingEngine);
 
-  // Create range detector with global debounce, per-pool cooldown is handled internally
+  // Collect pending async operations so we can await them per-candle.
+  // RangeDetector calls callbacks synchronously (fire-and-forget), so without
+  // this the loop can fire multiple onRangeExit before the first one writes to DB,
+  // causing duplicate hedge opens.
+  let pendingOps: Promise<void>[] = [];
+
   const rangeDetector = new RangeDetector(
-    async (event: RangeExitEvent) => {
-      try {
-        await engine.onRangeExit(event);
-      } catch (error) {
-        logger.debug({ error }, 'Backtest: range exit error');
-      }
+    (event: RangeExitEvent) => {
+      pendingOps.push(
+        engine.onRangeExit(event).catch((error) => {
+          logger.debug({ error }, 'Backtest: range exit error');
+        }),
+      );
     },
-    async (event: RangeReturnEvent) => {
-      try {
-        await engine.onRangeReturn(event);
-      } catch (error) {
-        logger.debug({ error }, 'Backtest: range return error');
-      }
+    (event: RangeReturnEvent) => {
+      pendingOps.push(
+        engine.onRangeReturn(event).catch((error) => {
+          logger.debug({ error }, 'Backtest: range return error');
+        }),
+      );
     },
     config.debounceCount,
     Math.ceil(config.cooldownSeconds / 60), // global fallback
@@ -188,24 +205,33 @@ export async function runBacktest(
     'Starting backtest',
   );
 
-  for (const point of prices) {
+  // Process all prices — await any async engine operations per candle
+  // to prevent race conditions (multiple hedges opening simultaneously).
+  for (let i = 0; i < prices.length; i++) {
+    const point = prices[i];
+
     // Mock Date.now() to the candle timestamp for realistic cooldown behavior
     const originalNow = Date.now;
     Date.now = () => point.timestamp;
 
     rangeDetector.onPriceUpdate(poolConfig.id, point.price);
     rangeTradingEngine.onPriceUpdate(poolConfig.id, point.price);
-    poolsRepo.updateStatus(poolConfig.id, 'in-range', point.price.toString());
 
     // Restore Date.now
     Date.now = originalNow;
 
-    // Allow async operations to settle (DryRunClient is mostly sync)
-    await new Promise((r) => setTimeout(r, 0));
+    // Drain any async operations triggered by this candle before moving on
+    if (pendingOps.length > 0) {
+      await Promise.all(pendingOps);
+      pendingOps = [];
+    }
   }
 
-  // Allow any final async operations
-  await new Promise((r) => setTimeout(r, 100));
+  // Force-close any open positions at last price (they'd otherwise be excluded)
+  const lastPrice = prices[prices.length - 1].price;
+  const lastTimestamp = prices[prices.length - 1].timestamp;
+  forceCloseOpenHedges(hedgesRepo, poolConfig.id, lastPrice, lastTimestamp);
+  forceCloseOpenRangeTrades(rangeTradesRepo, poolConfig.id, lastPrice, lastTimestamp);
 
   // Collect results from DB
   const hedgeTrades = collectHedgeTrades(hedgesRepo, poolConfig.id, prices);
@@ -233,6 +259,62 @@ export async function runBacktest(
   return result;
 }
 
+function forceCloseOpenHedges(
+  hedgesRepo: HedgesRepository,
+  poolConfigId: string,
+  lastPrice: number,
+  lastTimestamp: number,
+): void {
+  const openHedges = hedgesRepo.findByPool(poolConfigId).filter((h) => h.status === 'open');
+  for (const h of openHedges) {
+    const entryPrice = parseFloat(h.entryPrice);
+    const size = parseFloat(h.size);
+    const pnl =
+      h.side === 'short' ? (entryPrice - lastPrice) * size : (lastPrice - entryPrice) * size;
+    const closeFees = lastPrice * size * 0.00035; // estimate taker fee
+
+    // Mock Date.now to the last candle timestamp
+    const originalNow = Date.now;
+    Date.now = () => lastTimestamp;
+    hedgesRepo.close(
+      h.id,
+      lastPrice.toString(),
+      pnl.toFixed(2),
+      'manual',
+      false,
+      closeFees.toFixed(4),
+    );
+    Date.now = originalNow;
+  }
+}
+
+function forceCloseOpenRangeTrades(
+  rangeTradesRepo: RangeTradesRepository,
+  poolConfigId: string,
+  lastPrice: number,
+  lastTimestamp: number,
+): void {
+  const openTrades = rangeTradesRepo.findByPool(poolConfigId).filter((t) => t.status === 'open');
+  for (const t of openTrades) {
+    const entryPrice = parseFloat(t.entryPrice);
+    const size = parseFloat(t.size);
+    const pnl =
+      t.side === 'long' ? (lastPrice - entryPrice) * size : (entryPrice - lastPrice) * size;
+    const closeFees = lastPrice * size * 0.00035;
+
+    const originalNow = Date.now;
+    Date.now = () => lastTimestamp;
+    rangeTradesRepo.close(
+      t.id,
+      lastPrice.toString(),
+      pnl.toFixed(2),
+      'manual',
+      closeFees.toFixed(4),
+    );
+    Date.now = originalNow;
+  }
+}
+
 function collectHedgeTrades(
   hedgesRepo: HedgesRepository,
   poolConfigId: string,
@@ -241,32 +323,30 @@ function collectHedgeTrades(
   const allHedges = hedgesRepo.findByPool(poolConfigId);
   const lastPrice = prices[prices.length - 1].price;
 
-  return allHedges
-    .filter((h) => h.status !== 'open') // only count closed trades
-    .map((h) => {
-      const entryPrice = parseFloat(h.entryPrice);
-      const exitPrice = h.exitPrice ? parseFloat(h.exitPrice) : lastPrice;
-      const size = parseFloat(h.size);
-      let pnl: number;
-      if (h.side === 'short') {
-        pnl = (entryPrice - exitPrice) * size;
-      } else {
-        pnl = (exitPrice - entryPrice) * size;
-      }
+  return allHedges.map((h) => {
+    const entryPrice = parseFloat(h.entryPrice);
+    const exitPrice = h.exitPrice ? parseFloat(h.exitPrice) : lastPrice;
+    const size = parseFloat(h.size);
+    let pnl: number;
+    if (h.side === 'short') {
+      pnl = (entryPrice - exitPrice) * size;
+    } else {
+      pnl = (exitPrice - entryPrice) * size;
+    }
 
-      return {
-        side: h.side as 'long' | 'short',
-        entryPrice,
-        exitPrice,
-        size,
-        pnl,
-        fees: parseFloat(h.fees || '0'),
-        entryTime: h.openedAt,
-        exitTime: h.closedAt ?? h.openedAt,
-        closeReason: h.closeReason ?? 'unknown',
-        isFalseBreakout: !!h.isFalseBreakout,
-      };
-    });
+    return {
+      side: h.side as 'long' | 'short',
+      entryPrice,
+      exitPrice,
+      size,
+      pnl,
+      fees: parseFloat(h.fees || '0'),
+      entryTime: h.openedAt,
+      exitTime: h.closedAt ?? h.openedAt,
+      closeReason: h.closeReason ?? 'unknown',
+      isFalseBreakout: !!h.isFalseBreakout,
+    };
+  });
 }
 
 function collectRangeTrades(
@@ -277,30 +357,28 @@ function collectRangeTrades(
   const allTrades = rangeTradesRepo.findByPool(poolConfigId);
   const lastPrice = prices[prices.length - 1].price;
 
-  return allTrades
-    .filter((t) => t.status !== 'open')
-    .map((t) => {
-      const entryPrice = parseFloat(t.entryPrice);
-      const exitPrice = t.exitPrice ? parseFloat(t.exitPrice) : lastPrice;
-      const size = parseFloat(t.size);
-      let pnl: number;
-      if (t.side === 'long') {
-        pnl = (exitPrice - entryPrice) * size;
-      } else {
-        pnl = (entryPrice - exitPrice) * size;
-      }
+  return allTrades.map((t) => {
+    const entryPrice = parseFloat(t.entryPrice);
+    const exitPrice = t.exitPrice ? parseFloat(t.exitPrice) : lastPrice;
+    const size = parseFloat(t.size);
+    let pnl: number;
+    if (t.side === 'long') {
+      pnl = (exitPrice - entryPrice) * size;
+    } else {
+      pnl = (entryPrice - exitPrice) * size;
+    }
 
-      return {
-        side: t.side as 'long' | 'short',
-        entryPrice,
-        exitPrice,
-        size,
-        pnl,
-        fees: parseFloat(t.fees || '0'),
-        entryTime: t.openedAt,
-        exitTime: t.closedAt ?? t.openedAt,
-        closeReason: t.closeReason ?? 'unknown',
-        isFalseBreakout: false,
-      };
-    });
+    return {
+      side: t.side as 'long' | 'short',
+      entryPrice,
+      exitPrice,
+      size,
+      pnl,
+      fees: parseFloat(t.fees || '0'),
+      entryTime: t.openedAt,
+      exitTime: t.closedAt ?? t.openedAt,
+      closeReason: t.closeReason ?? 'unknown',
+      isFalseBreakout: false,
+    };
+  });
 }

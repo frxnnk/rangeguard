@@ -20,6 +20,7 @@ RUN pnpm install --frozen-lockfile
 
 # ---- dashboard-build ----
 FROM deps AS dashboard-build
+ARG NEXT_PUBLIC_BACKTEST_ONLY
 COPY . .
 RUN pnpm --filter @rangeguard/dashboard build
 

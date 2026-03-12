@@ -12,6 +12,8 @@
  *   --pair          Trading pair (e.g. ETH/USDC)
  *   --range         Price range (e.g. 1800-2200)
  *   --period        Historical period to backtest (e.g. 6m, 3m, 1y, 30d)
+ *   --start         Start date (e.g. 2022-11-01) — use with --end
+ *   --end           End date (e.g. 2022-12-01) — use with --start
  *   --csv           Path to CSV file with price data
  *   --pool-amount   Pool amount in USD (default: 10000)
  *   --leverage      Leverage (default: 10)
@@ -24,10 +26,12 @@
  */
 
 import { resolve } from 'path';
-import { loadCSV, fetchBinanceKlines, candlesToPrices, parsePeriod } from './data-loader.js';
+import { loadCSV, fetchBinanceKlinesCached, candlesToPrices, parsePeriod } from './data-loader.js';
 import { runBacktest, type BacktestConfig } from './orchestrator.js';
 import { analyze } from './analyzer.js';
 import { generateMarkdownReport, writeReport, type ReportData } from './reporter.js';
+import { simulateLp, type LpConfig } from './lp-simulator.js';
+import { analyzeUnified } from './unified-analysis.js';
 
 function parseArgs(args: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -47,8 +51,9 @@ function parseArgs(args: string[]): Record<string, string> {
 }
 
 function pairToSymbol(pair: string): string {
-  // ETH/USDC -> ETHUSDC
-  return pair.replace('/', '');
+  // Binance uses USDT pairs for most data. Map USDC → USDT for fetching.
+  const symbol = pair.replace('/', '');
+  return symbol.replace(/USDC$/, 'USDT');
 }
 
 function pairToHedgeAsset(pair: string): string {
@@ -71,6 +76,8 @@ Options:
   --pair          Trading pair (e.g. ETH/USDC)
   --range         Price range (e.g. 1800-2200)
   --period        Historical period (e.g. 6m, 3m, 1y, 30d)
+  --start         Start date (e.g. 2022-11-01) — use with --end
+  --end           End date (e.g. 2022-12-01) — use with --start
   --csv           Path to CSV file with price data
   --pool-amount   Pool amount in USD (default: 10000)
   --leverage      Leverage (default: 10)
@@ -78,6 +85,7 @@ Options:
   --debounce      Debounce count (default: 3)
   --cooldown      Cooldown seconds (default: 300)
   --trading       Enable range trading (default: false)
+  --fee-apr       Estimated pool fee APR % for IL comparison (default: 20)
   --sweep         Run parameter sweep across multiple configs
   --output        Output directory (default: data/backtest-results)
 `);
@@ -107,14 +115,25 @@ Options:
     const csvPath = resolve(process.cwd(), args['csv']);
     const candles = loadCSV(csvPath);
     prices = candlesToPrices(candles);
+  } else if (args['start'] && args['end']) {
+    const startTime = new Date(args['start']).getTime();
+    const endTime = new Date(args['end']).getTime();
+    if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+      console.error('Error: --start and --end must be valid dates with start < end');
+      process.exit(1);
+    }
+    const symbol = pairToSymbol(pair);
+    console.log(`Fetching ${symbol} klines (${args['start']} → ${args['end']})...`);
+    const candles = await fetchBinanceKlinesCached(symbol, startTime, endTime);
+    prices = candlesToPrices(candles);
   } else if (args['period']) {
     const { startTime, endTime } = parsePeriod(args['period']);
     const symbol = pairToSymbol(pair);
-    console.log(`Fetching ${symbol} klines from Binance (${args['period']})...`);
-    const candles = await fetchBinanceKlines(symbol, startTime, endTime);
+    console.log(`Fetching ${symbol} klines (${args['period']})...`);
+    const candles = await fetchBinanceKlinesCached(symbol, startTime, endTime);
     prices = candlesToPrices(candles);
   } else {
-    console.error('Error: --csv or --period is required');
+    console.error('Error: --csv, --period, or --start/--end is required');
     process.exit(1);
   }
 
@@ -171,6 +190,23 @@ async function runSingle(
   const rangeStats = analyze(result.rangeTrades);
   const combinedStats = analyze(allTrades);
 
+  // LP simulation + unified hedge vs IL analysis
+  const feeAprPercent = parseFloat(args['fee-apr'] ?? '20');
+  const lpConfig: LpConfig = {
+    poolAmountUsd: config.poolAmountUsd,
+    rangeLower: config.rangeLower,
+    rangeUpper: config.rangeUpper,
+    entryPrice: prices[0].price,
+    feeAprPercent,
+  };
+  const lpMetrics = simulateLp(lpConfig, prices);
+  const unifiedAnalysis = analyzeUnified(result.hedgeTrades, lpMetrics, prices, {
+    rangeLower: config.rangeLower,
+    rangeUpper: config.rangeUpper,
+    poolAmountUsd: config.poolAmountUsd,
+    entryPrice: prices[0].price,
+  });
+
   const reportData: ReportData = {
     config,
     hedgeStats,
@@ -179,6 +215,7 @@ async function runSingle(
     startTime: result.startTime,
     endTime: result.endTime,
     pricePoints: result.pricePoints,
+    unifiedAnalysis,
   };
 
   const markdown = generateMarkdownReport(reportData);
@@ -211,6 +248,8 @@ async function runSweep(
     `\nParameter sweep: ${hedgeRatios.length} ratios x ${debounceCounts.length} debounces x ${cooldowns.length} cooldowns = ${hedgeRatios.length * debounceCounts.length * cooldowns.length} configs\n`,
   );
 
+  const feeAprPercent = parseFloat(args['fee-apr'] ?? '20');
+
   const results: Array<{
     config: BacktestConfig;
     netPnl: number;
@@ -219,6 +258,8 @@ async function runSweep(
     sharpe: number;
     maxDD: number;
     falseBreakoutRate: number;
+    ilCovered: number;
+    hedgeEffectiveness: number;
   }> = [];
 
   for (const ratio of hedgeRatios) {
@@ -242,6 +283,22 @@ async function runSweep(
         );
         const stats = analyze(allTrades);
 
+        // Unified analysis for IL coverage
+        const lpConfig: LpConfig = {
+          poolAmountUsd: config.poolAmountUsd,
+          rangeLower: config.rangeLower,
+          rangeUpper: config.rangeUpper,
+          entryPrice: prices[0].price,
+          feeAprPercent,
+        };
+        const lpMetrics = simulateLp(lpConfig, prices);
+        const unified = analyzeUnified(result.hedgeTrades, lpMetrics, prices, {
+          rangeLower: config.rangeLower,
+          rangeUpper: config.rangeUpper,
+          poolAmountUsd: config.poolAmountUsd,
+          entryPrice: prices[0].price,
+        });
+
         results.push({
           config,
           netPnl: stats.netPnl,
@@ -250,6 +307,8 @@ async function runSweep(
           sharpe: stats.sharpeRatio,
           maxDD: stats.maxDrawdownPercent,
           falseBreakoutRate: stats.falseBreakoutRate,
+          ilCovered: unified.ilCoveredPercent,
+          hedgeEffectiveness: unified.hedgingEffectivenessRatio,
         });
 
         process.stdout.write('.');
@@ -259,16 +318,16 @@ async function runSweep(
 
   console.log('\n');
 
-  // Sort by net PnL
-  results.sort((a, b) => b.netPnl - a.netPnl);
+  // Sort by IL covered (primary goal)
+  results.sort((a, b) => b.ilCovered - a.ilCovered);
 
   // Print sweep results table
-  console.log('Parameter Sweep Results (sorted by Net PnL)');
-  console.log('='.repeat(100));
+  console.log('Parameter Sweep Results (sorted by IL Coverage)');
+  console.log('='.repeat(120));
   console.log(
-    'Ratio  Debounce  Cooldown  Trades  WinRate   NetPnL     Sharpe  MaxDD%  FalseBreakout%',
+    'Ratio  Debounce  Cooldown  Trades  WinRate   NetPnL     Sharpe  MaxDD%  FalseBreak%  ILCovered%  HedgeEff',
   );
-  console.log('-'.repeat(100));
+  console.log('-'.repeat(120));
 
   for (const r of results) {
     console.log(
@@ -280,16 +339,18 @@ async function runSweep(
         `$${r.netPnl.toFixed(2).padStart(8)}  ` +
         `${r.sharpe.toFixed(2).padStart(7)}  ` +
         `${r.maxDD.toFixed(1).padStart(5)}%  ` +
-        `${r.falseBreakoutRate.toFixed(1).padStart(13)}%`,
+        `${r.falseBreakoutRate.toFixed(1).padStart(10)}%  ` +
+        `${r.ilCovered.toFixed(1).padStart(9)}%  ` +
+        `${r.hedgeEffectiveness.toFixed(2).padStart(8)}x`,
     );
   }
 
-  console.log('='.repeat(100));
+  console.log('='.repeat(120));
 
   // Best config
   const best = results[0];
   console.log(
-    `\nBest: ratio=${best.config.hedgeRatio}, debounce=${best.config.debounceCount}, cooldown=${best.config.cooldownSeconds}s => PnL $${best.netPnl.toFixed(2)}, Sharpe ${best.sharpe.toFixed(2)}`,
+    `\nBest: ratio=${best.config.hedgeRatio}, debounce=${best.config.debounceCount}, cooldown=${best.config.cooldownSeconds}s => IL covered ${best.ilCovered.toFixed(1)}%, effectiveness ${best.hedgeEffectiveness.toFixed(2)}x`,
   );
 
   // Save sweep results

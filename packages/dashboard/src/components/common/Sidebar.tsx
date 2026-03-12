@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
+const ALL_NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
   { href: '/', label: 'Resumen', icon: LayoutGrid },
   { href: '/pools', label: 'Pools', icon: Layers },
   { href: '/wallets', label: 'Billeteras', icon: Wallet },
@@ -31,15 +31,23 @@ const NAV_ITEMS: { href: string; label: string; icon: ElementType }[] = [
   { href: '/about', label: 'Acerca de', icon: Info },
 ];
 
+const isBacktestOnly = process.env.NEXT_PUBLIC_BACKTEST_ONLY === 'true';
+
+const NAV_ITEMS = isBacktestOnly
+  ? ALL_NAV_ITEMS.filter((item) => ['/backtest', '/about'].includes(item.href))
+  : ALL_NAV_ITEMS;
+
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const { data: botStatus } = useQuery<{ running: boolean; lastSeen: number | null; env?: string }>({
-    queryKey: ['bot-status'],
-    queryFn: () => fetch('/api/bot-status').then((r) => r.json()),
-    refetchInterval: 10_000,
-  });
+  const { data: botStatus } = useQuery<{ running: boolean; lastSeen: number | null; env?: string }>(
+    {
+      queryKey: ['bot-status'],
+      queryFn: () => fetch('/api/bot-status').then((r) => r.json()),
+      refetchInterval: 10_000,
+    },
+  );
 
   const isRunning = botStatus?.running ?? false;
 
@@ -80,27 +88,31 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-            }`}
-          />
-          <span className="text-xs text-muted-foreground">
-            {isRunning ? 'Bot Activo' : 'Bot Inactivo'}
-          </span>
-        </div>
-        <button
-          onClick={async () => {
-            await fetch('/api/auth', { method: 'DELETE' });
-            router.push('/login');
-            router.refresh();
-          }}
-          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
-        >
-          <LogOut className="size-3.5" />
-          Cerrar sesión
-        </button>
+        {!isBacktestOnly && (
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isRunning ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+              }`}
+            />
+            <span className="text-xs text-muted-foreground">
+              {isRunning ? 'Bot Activo' : 'Bot Inactivo'}
+            </span>
+          </div>
+        )}
+        {!isBacktestOnly && (
+          <button
+            onClick={async () => {
+              await fetch('/api/auth', { method: 'DELETE' });
+              router.push('/login');
+              router.refresh();
+            }}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors mt-2"
+          >
+            <LogOut className="size-3.5" />
+            Cerrar sesión
+          </button>
+        )}
       </div>
     </>
   );
