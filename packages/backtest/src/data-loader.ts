@@ -209,11 +209,23 @@ export async function fetchCryptoCompareKlines(
   const [, fsym, tsym] = match;
 
   const candles: PriceCandle[] = [];
-  const baseUrl = 'https://min-api.cryptocompare.com/data/v2/histominute';
   const apiKey = process.env.CRYPTOCOMPARE_API_KEY || '';
   const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
-  let cursor = Math.floor(endTime / 1000); // CryptoCompare uses seconds
 
+  // Use histohour for periods > 7 days (histominute free tier only has 7 days)
+  // histohour goes back years and is sufficient for backtest granularity
+  const spanMs = endTime - startTime;
+  const useHourly = spanMs > 7 * 24 * 60 * 60 * 1000;
+  const baseUrl = useHourly
+    ? 'https://min-api.cryptocompare.com/data/v2/histohour'
+    : 'https://min-api.cryptocompare.com/data/v2/histominute';
+  const intervalSec = useHourly ? 3600 : 60;
+
+  if (useHourly) {
+    logger.info({ symbol, spanDays: (spanMs / 86_400_000).toFixed(0) }, 'Using hourly data (period > 7 days)');
+  }
+
+  let cursor = Math.floor(endTime / 1000); // CryptoCompare uses seconds
   const startSec = Math.floor(startTime / 1000);
 
   while (cursor > startSec) {
@@ -268,7 +280,7 @@ export async function fetchCryptoCompareKlines(
     cursor = oldestTs - 1;
 
     logger.info(
-      { fetched: data.length, total: candles.length, remaining: Math.ceil((cursor - startSec) / 60) },
+      { fetched: data.length, total: candles.length, remaining: Math.ceil((cursor - startSec) / intervalSec) },
       'Fetching CryptoCompare klines',
     );
 
