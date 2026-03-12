@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
 import {
   fetchBinanceKlinesCached,
   candlesToPrices,
@@ -9,6 +11,11 @@ import {
   analyzeUnified,
 } from '@rangeguard/backtest';
 import type { BacktestConfig } from '@rangeguard/backtest';
+
+// Resolve cache dir: try monorepo root first (Docker), then package dir (dev)
+const CACHE_DIR = existsSync(resolve(process.cwd(), 'packages/dashboard/data/price-cache'))
+  ? resolve(process.cwd(), 'packages/dashboard/data/price-cache')
+  : resolve(process.cwd(), 'data/price-cache');
 
 export const maxDuration = 300; // 5 minutes for long backtests
 
@@ -49,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     const symbol = pair.replace('/', '').replace(/USDC$/, 'USDT');
-    const candles = await fetchBinanceKlinesCached(symbol, startTime, endTime);
+    const candles = await fetchBinanceKlinesCached(symbol, startTime, endTime, CACHE_DIR);
 
     if (candles.length === 0) {
       return NextResponse.json(
