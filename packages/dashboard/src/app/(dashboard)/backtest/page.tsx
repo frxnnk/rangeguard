@@ -1001,6 +1001,9 @@ function BacktestResults({
         />
       </div>
 
+      {/* ─── Methodology ─── */}
+      <MethodologyCard />
+
       {/* ─── Strategy breakdown ─── */}
       {tradingEnabled && (hedgeTrades.length > 0 || rangeTrades.length > 0) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1787,6 +1790,114 @@ function FindingsCard({ result }: { result: BacktestResult }) {
           </div>
         ))}
       </CardContent>
+    </Card>
+  );
+}
+
+/* ─── Methodology card ─── */
+
+function MethodologyCard() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card className="border-border/40">
+      <CardHeader className="pb-0">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="flex items-center justify-between w-full"
+        >
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <BookOpen className="size-4 text-blue-400" />
+            Cómo se calcula cada métrica
+          </CardTitle>
+          <ChevronDown
+            className={`size-4 text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </CardHeader>
+      {open && (
+        <CardContent className="pt-4 space-y-4 text-xs text-muted-foreground leading-relaxed">
+          {/* IL */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Impermanent Loss (IL)</p>
+            <p>
+              Calculado con la fórmula exacta de Uniswap V3 para liquidez concentrada. Dado un rango
+              [Pa, Pb] y el precio actual P, se computan las cantidades de cada token que tendría la
+              posición LP. La diferencia entre el valor de esos tokens vs simplemente holdear
+              los tokens iniciales es el IL.
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 font-mono">
+              IL = Valor_LP(P) − Valor_HODL(P), donde Valor_LP usa las fórmulas √P de Uniswap V3
+            </p>
+          </div>
+
+          {/* Fees */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Fees LP estimados</p>
+            <p>
+              Se estiman a partir del APR del pool (configurable, default 20%) prorrateado por el
+              tiempo que el precio estuvo <strong>dentro del rango</strong>. Una posición fuera de
+              rango no genera fees — por eso se muestra el &quot;% en rango&quot;.
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 font-mono">
+              Fees = Pool_USD × (APR/100) × (horas_en_rango / 8760)
+            </p>
+          </div>
+
+          {/* Hedge PnL */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">PnL de Coberturas</p>
+            <p>
+              Cada vez que el precio sale del rango (confirmado por {'"'}debounce{'"'} señales consecutivas),
+              se abre un short en perpetuos. Cuando vuelve al rango, se cierra. El PnL es la
+              diferencia de precio × tamaño de la posición.
+            </p>
+          </div>
+
+          {/* Fees de trading */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Fees de trading</p>
+            <p>
+              Se estiman como 0.035% (taker fee de Hyperliquid) sobre el nocional de cada
+              apertura y cierre de posición.
+            </p>
+          </div>
+
+          {/* Funding */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Costo de Funding</p>
+            <p>
+              Los perpetuos cobran un &quot;funding rate&quot; cada 8 horas. En condiciones normales
+              (contango), los shorts pagan a los longs. Se usa una tasa promedio de 0.01% cada 8h.
+              Este costo se acumula por el tiempo que el hedge permanece abierto.
+            </p>
+            <p className="text-[11px] text-muted-foreground/60 font-mono">
+              Funding = Nocional_promedio × tasa_por_hora × horas_abierto (negativo para shorts)
+            </p>
+          </div>
+
+          {/* Efectividad */}
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">Efectividad de cobertura</p>
+            <p>
+              Mide cuánto del IL fue compensado por las ganancias netas del hedge (después de
+              descontar fees y funding). Un valor {'>'}1x significa que el hedge cubrió más que el IL.
+              El &quot;IL cubierto&quot; muestra este ratio como porcentaje del IL total del período.
+            </p>
+          </div>
+
+          {/* Data source */}
+          <div className="border-t border-border/30 pt-3 space-y-1">
+            <p className="font-medium text-foreground">Fuente de datos</p>
+            <p>
+              Precios históricos reales (velas de 1 minuto). Los presets usan datos pre-cacheados.
+              Las búsquedas personalizadas consultan Binance, Bybit o CryptoCompare según
+              disponibilidad geográfica.
+            </p>
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }
