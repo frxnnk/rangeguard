@@ -134,8 +134,8 @@ const PRESETS: Preset[] = [
   {
     name: 'Mercado lateral (Jun 2024)',
     description:
-      'Precio dentro del rango todo el período. 0 coberturas necesarias. LP gana fees sin IL.',
-    icon: 'crash',
+      'Precio dentro del rango todo el período. 0 coberturas necesarias. LP gana fees pero el IL dentro del rango puede superar las ganancias.',
+    icon: 'neutral',
     pair: 'ETH/USDC',
     rangeLower: '3300',
     rangeUpper: '3900',
