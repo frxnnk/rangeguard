@@ -1691,7 +1691,14 @@ function EducationalCard() {
 
 function FindingsCard({ result }: { result: BacktestResult }) {
   const { combinedStats, unifiedAnalysis, hedgeTrades, lpMetrics } = result;
-  const findings: Array<{ type: 'positive' | 'warning' | 'neutral'; text: string }> = [];
+  const findings: Array<{ type: 'positive' | 'warning' | 'neutral' | 'solution'; text: string }> = [];
+
+  // ── Analyze trade patterns ──
+  // Detect upward breakout losses: shorts where exitPrice > entryPrice (price went up)
+  const upsideShorts = hedgeTrades.filter((t) => t.side === 'short' && t.exitPrice > t.entryPrice);
+  const upsideLoss = upsideShorts.reduce((s, t) => s + t.pnl, 0);
+  const downsideShorts = hedgeTrades.filter((t) => t.side === 'short' && t.exitPrice <= t.entryPrice);
+  const downsideGain = downsideShorts.reduce((s, t) => s + t.pnl, 0);
 
   // No trades at all
   if (combinedStats.totalTrades === 0) {
@@ -1738,17 +1745,57 @@ function FindingsCard({ result }: { result: BacktestResult }) {
     }
   }
 
+  // ── Detect upward breakout problem ──
+  if (upsideShorts.length > 0 && upsideLoss < -10) {
+    const pctUpside = ((upsideShorts.length / hedgeTrades.length) * 100).toFixed(0);
+    findings.push({
+      type: 'warning',
+      text: `${upsideShorts.length} cobertura(s) abrieron short contra una suba (${pctUpside}% de los trades). Pérdida por shorts al alza: ${fmtUsd(upsideLoss)}.`,
+    });
+    findings.push({
+      type: 'solution',
+      text: `Solución: Configurar cobertura "solo hacia abajo". Cuando el precio sube arriba del rango, el LP ya está 100% en stablecoin — no hay exposición que cubrir. Shortear una suba no es cobertura, es especulación.`,
+    });
+    // Estimate savings
+    if (downsideGain > 0) {
+      const hypothetical = downsideGain + upsideLoss;
+      findings.push({
+        type: 'solution',
+        text: `Si solo se hubieran ejecutado las coberturas hacia abajo: PnL hedge ${fmtUsd(downsideGain)} en vez de ${fmtUsd(downsideGain + upsideLoss)}. Ahorro estimado: ${fmtUsdNeutral(Math.abs(upsideLoss))}.`,
+      });
+    }
+  }
+
   // False breakouts
   if (combinedStats.falseBreakoutRate > 50 && combinedStats.totalTrades > 0) {
     findings.push({
       type: 'warning',
-      text: `${combinedStats.falseBreakoutRate.toFixed(0)}% de falsas rupturas. Aumentar el debounce o cooldown podría reducirlas.`,
+      text: `${combinedStats.falseBreakoutRate.toFixed(0)}% de falsas rupturas. Muchos open/close rápidos acumulan fees sin beneficio.`,
+    });
+    findings.push({
+      type: 'solution',
+      text: 'Solución: Aumentar el debounce (más señales consecutivas antes de abrir) o el cooldown (más espera entre coberturas). Probá con debounce 5 y cooldown 600s.',
     });
   } else if (combinedStats.falseBreakoutRate > 0 && combinedStats.falseBreakoutRate <= 30) {
     findings.push({
       type: 'positive',
       text: `Solo ${combinedStats.falseBreakoutRate.toFixed(0)}% de falsas rupturas. Los parámetros de debounce filtran bien el ruido.`,
     });
+  }
+
+  // Funding cost is significant
+  if (unifiedAnalysis && Math.abs(unifiedAnalysis.totalHedgeFunding) > 5 && hedgeTrades.length > 0) {
+    const avgHoldHours = hedgeTrades.reduce((s, t) => s + (t.exitTime - t.entryTime), 0) / hedgeTrades.length / 3_600_000;
+    if (avgHoldHours > 24) {
+      findings.push({
+        type: 'warning',
+        text: `Costo de funding acumulado: ${fmtUsd(unifiedAnalysis.totalHedgeFunding)}. Las coberturas estuvieron abiertas ~${avgHoldHours.toFixed(0)}h en promedio.`,
+      });
+      findings.push({
+        type: 'solution',
+        text: 'Solución: Agregar trailing stop a los hedges para cerrar posiciones que no avanzan, reduciendo el tiempo abierto y el costo de funding.',
+      });
+    }
   }
 
   // Win rate
@@ -1787,7 +1834,12 @@ function FindingsCard({ result }: { result: BacktestResult }) {
               <AlertTriangle className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
             )}
             {f.type === 'neutral' && <Info className="size-3.5 text-blue-400 mt-0.5 shrink-0" />}
-            <span className="text-muted-foreground">{f.text}</span>
+            {f.type === 'solution' && (
+              <Lightbulb className="size-3.5 text-yellow-400 mt-0.5 shrink-0" />
+            )}
+            <span className={f.type === 'solution' ? 'text-foreground/80' : 'text-muted-foreground'}>
+              {f.text}
+            </span>
           </div>
         ))}
       </CardContent>
