@@ -74,6 +74,33 @@ export default function AboutPage() {
         </ul>
 
         <h3 className="text-xs font-medium text-foreground/70 uppercase tracking-wider pt-2">
+          Resiliencia
+        </h3>
+        <ul className="space-y-1.5">
+          <Li done>
+            Circuit breaker: pausa aperturas automáticas tras N fallos consecutivos por pool
+          </Li>
+          <Li done>Half-open: reintenta una vez tras timeout configurable, se cierra si tiene éxito</Li>
+          <Li done>Configurable desde el dashboard (Settings → Monitoreo)</Li>
+          <Li done>Compartido entre hedge engine y range trading engine</Li>
+          <Li done>No bloquea cierres manuales, range-return ni reconciliación</Li>
+        </ul>
+
+        <h3 className="text-xs font-medium text-foreground/70 uppercase tracking-wider pt-2">
+          Lectura on-chain de posiciones LP
+        </h3>
+        <ul className="space-y-1.5">
+          <Li done>
+            Lee valor real de la posición LP desde el NFT de Uniswap V3 (NonfungiblePositionManager)
+          </Li>
+          <Li done>Calcula token amounts con fórmulas Uniswap V3 en bigint (Q96 precision)</Li>
+          <Li done>Sync automático cada 5 minutos para pools configurados como &quot;on-chain&quot;</Li>
+          <Li done>Botón &quot;Sincronizar ahora&quot; en el editor de pool</Li>
+          <Li done>Soporte multi-chain (misma dirección NFT en ETH, Arb, Base, Polygon)</Li>
+          <Li done>Cache de decimals de tokens para evitar llamadas repetidas</Li>
+        </ul>
+
+        <h3 className="text-xs font-medium text-foreground/70 uppercase tracking-wider pt-2">
           Dashboard
         </h3>
         <ul className="space-y-1.5">
@@ -86,6 +113,8 @@ export default function AboutPage() {
           <Li done>Costos por pool (trades, PnL, fees, win/loss) — R11</Li>
           <Li done>Limpieza de historial por pool o global — R11</Li>
           <Li done>Interfaz completa en español — R12</Li>
+          <Li done>Configuración de circuit breaker desde Settings</Li>
+          <Li done>Pool amount: toggle Manual / Leer de blockchain con Token ID del NFT LP</Li>
         </ul>
 
         <h3 className="text-xs font-medium text-foreground/70 uppercase tracking-wider pt-2">
@@ -103,7 +132,6 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-foreground font-semibold">Roadmap</h2>
         <ul className="space-y-1.5">
-          <Li>Lectura automática de posiciones LP on-chain</Li>
           <Li>Multi-DEX hedging (dYdX, GMX)</Li>
           <Li>Auto-rebalance del hedge si cambia el monto del pool</Li>
           <Li>Alertas vía webhook (Discord / Telegram)</Li>
@@ -115,6 +143,11 @@ export default function AboutPage() {
       <section className="space-y-3">
         <h2 className="text-foreground font-semibold">Changelog</h2>
         <div className="space-y-4">
+          <ChangelogEntry version="2.1" date="2026-03-12">
+            Circuit breaker (pausa automática tras fallos consecutivos, configurable desde dashboard),
+            lectura automática de posiciones LP on-chain vía NFT Uniswap V3 con sync cada 5 min,
+            nuevas funciones tick-math (bigint Q96), 163 tests.
+          </ChangelogEntry>
           <ChangelogEntry version="2.0" date="2026-03-11">
             R10 range trading bot, R11 costos por pool + limpieza de historial, R12 UI en español,
             sistema de backtesting, optimizaciones de performance (parallel wallets, adaptive
@@ -128,7 +161,7 @@ export default function AboutPage() {
       </section>
 
       <footer className="border-t border-border pt-6 text-xs text-muted-foreground/60">
-        125 tests · 0 errores de typecheck · E2E verificado en HL testnet
+        163 tests · 0 errores de typecheck · E2E verificado en HL testnet
       </footer>
     </div>
   );
