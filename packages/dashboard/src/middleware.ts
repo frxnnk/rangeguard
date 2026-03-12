@@ -13,11 +13,14 @@ function isPublic(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Backtest-only mode: redirect root to /backtest
-  if (process.env.BACKTEST_ONLY === 'true' && pathname === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/backtest';
-    return NextResponse.redirect(url);
+  // Backtest-only mode: redirect root to /backtest, skip auth entirely
+  if (process.env.BACKTEST_ONLY === 'true') {
+    if (pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/backtest';
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
   }
 
   // No API key configured → dev mode, allow everything
