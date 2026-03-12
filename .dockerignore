@@ -3,6 +3,8 @@ dist
 .next
 data/*
 !data/price-cache
+packages/dashboard/data/*
+!packages/dashboard/data/price-cache
 *.db
 *.db-wal
 *.db-shm
