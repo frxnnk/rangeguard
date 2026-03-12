@@ -21,6 +21,7 @@ import {
   PoolWatcher,
   RangeDetector,
   PriceFeed,
+  LiquidityReader,
 } from '@rangeguard/pool-monitor';
 import {
   HedgingEngine,
@@ -183,7 +184,10 @@ async function main() {
   }
 
   // 8. Initialize circuit breaker (shared between hedge + range trading engines)
-  const circuitBreaker = new CircuitBreaker();
+  const circuitBreaker = new CircuitBreaker({
+    failureThreshold: config.monitoring.circuitBreakerThreshold,
+    resetTimeoutMs: config.monitoring.circuitBreakerResetMs,
+  });
 
   // Initialize hedging engine with event callbacks
   const engine = new HedgingEngine(
@@ -571,6 +575,35 @@ async function main() {
     60 * 60 * 1000,
   ); // every hour
 
+  // 17. LP position auto-sync — reads on-chain value every 5 minutes
+  const liquidityReader = new LiquidityReader(chainClients);
+  const lpSyncInterval = setInterval(
+    async () => {
+      try {
+        const activePools = poolsRepo.findActive();
+        for (const pool of activePools) {
+          if (pool.poolAmountSource !== 'on-chain' || !pool.lpTokenId) continue;
+          try {
+            const position = await liquidityReader.readPosition(
+              pool.chainId,
+              pool.lpTokenId,
+              pool.poolAddress,
+            );
+            poolsRepo.updatePoolAmount(pool.id, position.valueUsd.toFixed(2), Date.now());
+          } catch (error) {
+            logger.warn(
+              { poolConfigId: pool.id, error },
+              'Failed to sync LP position — will retry next cycle',
+            );
+          }
+        }
+      } catch (error) {
+        logger.warn({ error }, 'LP sync cycle failed');
+      }
+    },
+    5 * 60 * 1000,
+  ); // every 5 minutes
+
   alert(webhookUrl, `⚡ Bot started — monitoring ${watchedPoolIds.size} pool(s)`);
   logger.info('Bot is running. Press Ctrl+C to stop.');
 
@@ -588,6 +621,7 @@ async function main() {
     clearInterval(poolSyncInterval);
     clearInterval(heartbeatInterval);
     clearInterval(cleanupInterval);
+    clearInterval(lpSyncInterval);
     walletMonitor.stop();
     poolWatcher.unwatchAll();
     eventBus.removeAllListeners();

@@ -139,6 +139,21 @@ export function runMigrations(db: Database.Database): void {
     }
   }
 
+  // Add LP position reading columns
+  const lpColumns = [
+    `ALTER TABLE pool_configs ADD COLUMN lp_token_id TEXT`,
+    `ALTER TABLE pool_configs ADD COLUMN pool_amount_source TEXT NOT NULL DEFAULT 'manual'`,
+    `ALTER TABLE pool_configs ADD COLUMN pool_amount_synced_at INTEGER`,
+  ];
+
+  for (const sql of lpColumns) {
+    try {
+      db.exec(sql);
+    } catch {
+      // Column already exists — safe to ignore
+    }
+  }
+
   // Add range trading columns to pool_configs (ALTERs are idempotent via try/catch)
   const tradingColumns = [
     `ALTER TABLE pool_configs ADD COLUMN trading_enabled INTEGER NOT NULL DEFAULT 0`,

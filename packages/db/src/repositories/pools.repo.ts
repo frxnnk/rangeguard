@@ -28,6 +28,10 @@ interface PoolConfigRow {
   current_price: string | null;
   created_at: number;
   updated_at: number;
+  // LP position reading
+  lp_token_id: string | null;
+  pool_amount_source: string;
+  pool_amount_synced_at: number | null;
   // Range trading (R10)
   trading_enabled: number;
   trading_leverage: number;
@@ -65,6 +69,9 @@ function rowToPoolConfig(row: PoolConfigRow): PoolConfig {
     currentPrice: row.current_price ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    lpTokenId: row.lp_token_id ?? undefined,
+    poolAmountSource: (row.pool_amount_source as 'manual' | 'on-chain') ?? 'manual',
+    poolAmountSyncedAt: row.pool_amount_synced_at ?? undefined,
     tradingEnabled: row.trading_enabled === 1,
     tradingLeverage: row.trading_leverage,
     tradingStopLossPercent: row.trading_stop_loss_percent,
@@ -93,6 +100,7 @@ export class PoolsRepository {
         pool_amount, hedge_asset, leverage, protection_direction,
         protection_wallet_id, profit_wallet_enabled, hedge_ratio,
         hedge_cooldown_seconds, debounce_count, protection_active,
+        lp_token_id, pool_amount_source,
         status, created_at, updated_at
       ) VALUES (
         @id, @name, @chainId, @chainName, @rpcUrl, @poolAddress,
@@ -100,6 +108,7 @@ export class PoolsRepository {
         @poolAmount, @hedgeAsset, @leverage, @protectionDirection,
         @protectionWalletId, @profitWalletEnabled, @hedgeRatio,
         @hedgeCooldownSeconds, @debounceCount, @protectionActive,
+        @lpTokenId, @poolAmountSource,
         @status, @createdAt, @updatedAt
       )
     `);
@@ -126,6 +135,8 @@ export class PoolsRepository {
       hedgeCooldownSeconds: data.hedgeCooldownSeconds ?? 300,
       debounceCount: data.debounceCount ?? 3,
       protectionActive: data.protectionActive ? 1 : 0,
+      lpTokenId: data.lpTokenId ?? null,
+      poolAmountSource: data.poolAmountSource ?? 'manual',
       status: 'in-range',
       createdAt: now,
       updatedAt: now,
@@ -243,6 +254,14 @@ export class PoolsRepository {
       fields.push('protection_active = @protectionActive');
       values.protectionActive = data.protectionActive ? 1 : 0;
     }
+    if (data.lpTokenId !== undefined) {
+      fields.push('lp_token_id = @lpTokenId');
+      values.lpTokenId = data.lpTokenId;
+    }
+    if (data.poolAmountSource !== undefined) {
+      fields.push('pool_amount_source = @poolAmountSource');
+      values.poolAmountSource = data.poolAmountSource;
+    }
     if (data.tradingEnabled !== undefined) {
       fields.push('trading_enabled = @tradingEnabled');
       values.tradingEnabled = data.tradingEnabled ? 1 : 0;
@@ -305,6 +324,13 @@ export class PoolsRepository {
       'UPDATE pool_configs SET protection_active = ?, updated_at = ? WHERE id = ?',
     );
     stmt.run(active ? 1 : 0, Date.now(), id);
+  }
+
+  updatePoolAmount(id: string, poolAmount: string, syncedAt: number): void {
+    const stmt = this.db.prepare(
+      'UPDATE pool_configs SET pool_amount = ?, pool_amount_synced_at = ?, updated_at = ? WHERE id = ?',
+    );
+    stmt.run(poolAmount, syncedAt, Date.now(), id);
   }
 
   delete(id: string): void {

@@ -17,6 +17,8 @@ export interface AppConfig {
     pollingIntervalMs: number; // fallback polling if WS disconnects
     walletCheckIntervalMs: number;
     cooldownMinutes: number; // post-close cooldown to avoid whipsaw
+    circuitBreakerThreshold: number; // consecutive failures before pausing pool (default 3)
+    circuitBreakerResetMs: number; // ms before retrying after circuit opens (default 300000)
   };
   dashboard: {
     port: number;
@@ -32,6 +34,8 @@ export const DEFAULT_CONFIG: Partial<AppConfig> = {
     pollingIntervalMs: 5000,
     walletCheckIntervalMs: 30000,
     cooldownMinutes: 5,
+    circuitBreakerThreshold: 3,
+    circuitBreakerResetMs: 300000,
   },
   dashboard: {
     port: 3000,

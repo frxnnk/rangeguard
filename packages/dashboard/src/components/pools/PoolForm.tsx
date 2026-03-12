@@ -78,6 +78,8 @@ export function PoolForm() {
     rangeLower: '2000',
     rangeUpper: '2500',
     poolAmount: '10000',
+    poolAmountSource: 'manual' as 'manual' | 'on-chain',
+    lpTokenId: '',
     leverage: 10,
     hedgeRatio: '1.0',
     hedgeCooldownSeconds: '300',
@@ -119,6 +121,8 @@ export function PoolForm() {
         poolAmount: form.poolAmount,
         hedgeAsset: selectedPair.hedgeAsset,
         leverage: form.leverage,
+        poolAmountSource: form.poolAmountSource,
+        lpTokenId: form.poolAmountSource === 'on-chain' ? form.lpTokenId : undefined,
         hedgeRatio: parseFloat(form.hedgeRatio),
         hedgeCooldownSeconds: parseInt(form.hedgeCooldownSeconds),
         debounceCount: parseInt(form.debounceCount),
@@ -303,6 +307,46 @@ export function PoolForm() {
             </div>
 
             <div className="space-y-2">
+              <Label>Fuente del Monto</Label>
+              <div className="flex items-center gap-4">
+                <Select
+                  value={form.poolAmountSource}
+                  onValueChange={(value) =>
+                    setForm((f) => ({
+                      ...f,
+                      poolAmountSource: value as 'manual' | 'on-chain',
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="on-chain">Leer de blockchain</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {form.poolAmountSource === 'on-chain' && (
+              <div className="space-y-2">
+                <Label>Token ID del NFT LP</Label>
+                <Input
+                  type="text"
+                  value={form.lpTokenId}
+                  onChange={(e) => setForm((f) => ({ ...f, lpTokenId: e.target.value }))}
+                  placeholder="123456"
+                  required
+                  className="bg-muted border-border text-foreground font-mono"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  ID del NFT de Uniswap V3 NonfungiblePositionManager
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2">
               <Label>Monto del Pool (USD)</Label>
               <Input
                 type="number"
@@ -310,10 +354,13 @@ export function PoolForm() {
                 value={form.poolAmount}
                 onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
                 required
+                readOnly={form.poolAmountSource === 'on-chain'}
                 className="bg-muted border-border text-foreground"
               />
               <p className="text-[11px] text-muted-foreground">
-                Valor total de tu posición LP en USD
+                {form.poolAmountSource === 'on-chain'
+                  ? 'Se actualizará automáticamente desde la blockchain'
+                  : 'Valor total de tu posición LP en USD'}
               </p>
             </div>
           </section>

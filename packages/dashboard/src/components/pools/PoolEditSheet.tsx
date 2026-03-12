@@ -24,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
 const CHAINS = [
   { id: 1, name: 'Ethereum' },
@@ -68,6 +68,8 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [syncing, setSyncing] = useState(false);
+
   const [form, setForm] = useState({
     name: '',
     chainId: 42161,
@@ -78,6 +80,8 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
     rangeLower: '',
     rangeUpper: '',
     poolAmount: '',
+    poolAmountSource: 'manual' as 'manual' | 'on-chain',
+    lpTokenId: '',
     leverage: 10,
     hedgeRatio: '1.0',
     hedgeCooldownSeconds: '300',
@@ -120,6 +124,8 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
           rangeLower: pool.rangeLower.toString(),
           rangeUpper: pool.rangeUpper.toString(),
           poolAmount: pool.poolAmount,
+          poolAmountSource: pool.poolAmountSource || 'manual',
+          lpTokenId: pool.lpTokenId || '',
           leverage: pool.leverage,
           hedgeRatio: (pool.hedgeRatio ?? 1.0).toString(),
           hedgeCooldownSeconds: (pool.hedgeCooldownSeconds ?? 300).toString(),
@@ -165,6 +171,8 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
         rangeLower: parseFloat(form.rangeLower),
         rangeUpper: parseFloat(form.rangeUpper),
         poolAmount: form.poolAmount,
+        poolAmountSource: form.poolAmountSource,
+        lpTokenId: form.poolAmountSource === 'on-chain' ? form.lpTokenId : undefined,
         leverage: form.leverage,
         hedgeRatio: parseFloat(form.hedgeRatio),
         hedgeCooldownSeconds: parseInt(form.hedgeCooldownSeconds),
@@ -339,15 +347,89 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
               </div>
 
               <div className="space-y-1.5">
+                <Label className="text-xs">Fuente del Monto</Label>
+                <Select
+                  value={form.poolAmountSource}
+                  onValueChange={(value) =>
+                    setForm((f) => ({
+                      ...f,
+                      poolAmountSource: value as 'manual' | 'on-chain',
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="on-chain">Leer de blockchain</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {form.poolAmountSource === 'on-chain' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Token ID del NFT LP</Label>
+                  <Input
+                    type="text"
+                    value={form.lpTokenId}
+                    onChange={(e) => setForm((f) => ({ ...f, lpTokenId: e.target.value }))}
+                    placeholder="123456"
+                    required
+                    className="bg-muted border-border text-foreground font-mono text-xs"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
                 <Label className="text-xs">Monto del Pool (USD)</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  value={form.poolAmount}
-                  onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
-                  required
-                  className="bg-muted border-border text-foreground"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="any"
+                    value={form.poolAmount}
+                    onChange={(e) => setForm((f) => ({ ...f, poolAmount: e.target.value }))}
+                    required
+                    readOnly={form.poolAmountSource === 'on-chain'}
+                    className="bg-muted border-border text-foreground"
+                  />
+                  {form.poolAmountSource === 'on-chain' && poolId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={syncing || !form.lpTokenId}
+                      onClick={async () => {
+                        setSyncing(true);
+                        try {
+                          const res = await fetch(`/api/pools/${poolId}/sync-liquidity`, {
+                            method: 'POST',
+                          });
+                          if (!res.ok) {
+                            const data = await res.json();
+                            throw new Error(data.error || 'Sync failed');
+                          }
+                          const data = await res.json();
+                          setForm((f) => ({ ...f, poolAmount: data.poolAmount }));
+                          toast.success(`Monto sincronizado: $${data.poolAmount}`);
+                        } catch (err) {
+                          toast.error(
+                            err instanceof Error ? err.message : 'Error al sincronizar',
+                          );
+                        } finally {
+                          setSyncing(false);
+                        }
+                      }}
+                    >
+                      <RefreshCw className={`size-4 ${syncing ? 'animate-spin' : ''}`} />
+                    </Button>
+                  )}
+                </div>
+                {form.poolAmountSource === 'on-chain' && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Se actualiza automáticamente cada 5 min
+                  </p>
+                )}
               </div>
             </section>
 

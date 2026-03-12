@@ -9,6 +9,8 @@ function getDefaults(): Record<string, string> {
     polling_interval_ms: '5000',
     wallet_check_interval_ms: '30000',
     cooldown_minutes: '5',
+    circuit_breaker_threshold: '3',
+    circuit_breaker_reset_ms: '300000',
     hl_api_url:
       env === 'mainnet'
         ? 'https://api.hyperliquid.xyz'

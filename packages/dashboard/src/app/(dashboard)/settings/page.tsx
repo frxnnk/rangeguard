@@ -26,6 +26,8 @@ const DEFAULTS: Record<string, string> = {
   polling_interval_ms: '5000',
   wallet_check_interval_ms: '30000',
   cooldown_minutes: '5',
+  circuit_breaker_threshold: '3',
+  circuit_breaker_reset_ms: '300000',
   hl_api_url: 'https://api.hyperliquid-testnet.xyz',
   hl_ws_url: 'wss://api.hyperliquid-testnet.xyz/ws',
   log_level: 'info',
@@ -225,6 +227,41 @@ export default function SettingsPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Tiempo de espera después de cerrar una cobertura antes de reabrir.
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="circuit_breaker_threshold">Circuit Breaker — Umbral de Fallos</Label>
+                  <Input
+                    id="circuit_breaker_threshold"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={form.circuit_breaker_threshold}
+                    onChange={(e) => updateField('circuit_breaker_threshold', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Fallos consecutivos en un pool antes de pausar aperturas automáticas.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="circuit_breaker_reset_ms">Circuit Breaker — Reset (ms)</Label>
+                  <Input
+                    id="circuit_breaker_reset_ms"
+                    type="number"
+                    min="10000"
+                    max="3600000"
+                    step="10000"
+                    value={form.circuit_breaker_reset_ms}
+                    onChange={(e) => updateField('circuit_breaker_reset_ms', e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Tiempo en ms antes de reintentar tras pausar un pool. (300000 = 5 min)
                   </p>
                 </div>
               </div>

@@ -44,6 +44,8 @@ export function loadConfig(): AppConfig {
       pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '5000'),
       walletCheckIntervalMs: parseInt(process.env.WALLET_CHECK_INTERVAL_MS || '15000'),
       cooldownMinutes: parseInt(process.env.COOLDOWN_MINUTES || '5'),
+      circuitBreakerThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || '3'),
+      circuitBreakerResetMs: parseInt(process.env.CIRCUIT_BREAKER_RESET_MS || '300000'),
     },
     dashboard: {
       port: parseInt(process.env.DASHBOARD_PORT || '3000'),
@@ -82,6 +84,8 @@ export function applyDbOverrides(config: AppConfig, settingsRepo: SettingsReposi
     'polling_interval_ms',
     'wallet_check_interval_ms',
     'cooldown_minutes',
+    'circuit_breaker_threshold',
+    'circuit_breaker_reset_ms',
     'hl_api_url',
     'hl_ws_url',
     'log_level',
@@ -111,6 +115,18 @@ export function applyDbOverrides(config: AppConfig, settingsRepo: SettingsReposi
     merged.monitoring = {
       ...merged.monitoring,
       cooldownMinutes: parseInt(dbSettings.cooldown_minutes),
+    };
+  }
+  if (dbSettings.circuit_breaker_threshold) {
+    merged.monitoring = {
+      ...merged.monitoring,
+      circuitBreakerThreshold: parseInt(dbSettings.circuit_breaker_threshold),
+    };
+  }
+  if (dbSettings.circuit_breaker_reset_ms) {
+    merged.monitoring = {
+      ...merged.monitoring,
+      circuitBreakerResetMs: parseInt(dbSettings.circuit_breaker_reset_ms),
     };
   }
   // Guard: only apply DB HL URLs if they match the current env

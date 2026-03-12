@@ -107,12 +107,21 @@ importers:
 
   packages/dashboard:
     dependencies:
+      '@rangeguard/backtest':
+        specifier: workspace:*
+        version: link:../backtest
       '@rangeguard/common':
         specifier: workspace:*
         version: link:../common
       '@rangeguard/db':
         specifier: workspace:*
         version: link:../db
+      '@rangeguard/hedging-engine':
+        specifier: workspace:*
+        version: link:../hedging-engine
+      '@rangeguard/pool-monitor':
+        specifier: workspace:*
+        version: link:../pool-monitor
       '@rangeguard/security':
         specifier: workspace:*
         version: link:../security
