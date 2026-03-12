@@ -134,6 +134,19 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error ejecutando backtest';
+
+    // Detect Binance geo-restriction (HTTP 451)
+    if (message.includes('451') || message.includes('restricted location')) {
+      return NextResponse.json(
+        {
+          error:
+            'No se pueden obtener datos de Binance desde este servidor (restricción geográfica). ' +
+            'Usá uno de los presets pre-cargados o ejecutá el backtest localmente.',
+        },
+        { status: 451 },
+      );
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

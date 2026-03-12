@@ -1,7 +1,8 @@
 node_modules
 dist
 .next
-data
+data/*
+!data/price-cache
 *.db
 *.db-wal
 *.db-shm

@@ -12,8 +12,9 @@ out/
 *.enc
 vault.enc
 
-# Data & Database
-data/
+# Data & Database (keep price-cache for backtest presets)
+data/*
+!data/price-cache/
 *.db
 *.db-wal
 *.db-shm
