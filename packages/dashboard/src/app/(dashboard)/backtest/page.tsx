@@ -21,8 +21,12 @@ import {
   BookOpen,
   Lightbulb,
   CheckCircle2,
-  XCircle,
   Info,
+  ArrowDown,
+  Clock,
+  Flame,
+  Shield,
+  Wrench,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -66,6 +70,10 @@ interface Preset {
   name: string;
   description: string;
   icon: 'crash' | 'neutral' | 'warning';
+  verdict: 'works' | 'partial' | 'fails' | 'neutral';
+  verdictLabel: string;
+  expectedPnl: string;
+  keyInsight: string;
   pair: string;
   rangeLower: string;
   rangeUpper: string;
@@ -83,8 +91,12 @@ const PRESETS: Preset[] = [
   {
     name: 'FTX Crash (Nov 2022)',
     description:
-      'ETH $1570→$1100 en días. Crash fuerte y sostenido. Mejor caso para la cobertura — el short gana mientras el LP sufre IL.',
+      'ETH $1570→$1100 en días. Crash fuerte y sostenido — el short gana mientras el LP sufre IL.',
     icon: 'crash',
+    verdict: 'works',
+    verdictLabel: 'Funciona',
+    expectedPnl: '+$3,095',
+    keyInsight: 'Mejor escenario: crash limpio sin rebotes',
     pair: 'ETH/USDC',
     rangeLower: '1400',
     rangeUpper: '1600',
@@ -100,8 +112,12 @@ const PRESETS: Preset[] = [
   {
     name: 'Rally ETH (Feb 2024)',
     description:
-      'ETH $2300→$3500 en un mes. Ruptura al alza sostenida. El short pierde — la cobertura NO funciona en rallies.',
+      'ETH $2300→$3500 en un mes. El long pierde en la ruptura al alza — la cobertura NO funciona en rallies.',
     icon: 'warning',
+    verdict: 'fails',
+    verdictLabel: 'No funciona',
+    expectedPnl: '-$3,882',
+    keyInsight: 'Cubrir rupturas al alza es especulación, no cobertura',
     pair: 'ETH/USDC',
     rangeLower: '2200',
     rangeUpper: '2800',
@@ -117,8 +133,12 @@ const PRESETS: Preset[] = [
   {
     name: 'Corrección Abr 2024',
     description:
-      'ETH $3640→$2880. Corrección parcial con rebotes. Cobertura parcial, falsas rupturas restan valor.',
+      'ETH $3640→$2880. Corrección con rebotes. Funciona principalmente por funding rate, no por el hedge.',
     icon: 'neutral',
+    verdict: 'partial',
+    verdictLabel: 'Parcial',
+    expectedPnl: '+$910',
+    keyInsight: 'Funding rate ($771) fue más que el hedge PnL neto',
     pair: 'ETH/USDC',
     rangeLower: '3200',
     rangeUpper: '3800',
@@ -134,8 +154,12 @@ const PRESETS: Preset[] = [
   {
     name: 'Mercado lateral (Jun 2024)',
     description:
-      'Precio dentro del rango todo el período. 0 coberturas necesarias. LP gana fees pero el IL dentro del rango puede superar las ganancias.',
+      'Precio dentro del rango. 0 coberturas. LP gana fees pero IL dentro del rango puede superar las ganancias.',
     icon: 'neutral',
+    verdict: 'neutral',
+    verdictLabel: 'Sin hedge',
+    expectedPnl: '-$61',
+    keyInsight: 'Sin ruptura → sin cobertura. LP sola.',
     pair: 'ETH/USDC',
     rangeLower: '3300',
     rangeUpper: '3900',
@@ -151,8 +175,12 @@ const PRESETS: Preset[] = [
   {
     name: 'Falsas rupturas (Abr 2024)',
     description:
-      'Precio oscila en el borde del rango 45 días. Muchas falsas rupturas. Escenario donde la cobertura pierde por fees acumulados.',
+      'Precio oscila en el borde 45 días. 98% falsas rupturas — fees acumulados destruyen la rentabilidad.',
     icon: 'warning',
+    verdict: 'fails',
+    verdictLabel: 'No funciona',
+    expectedPnl: '-$1,308',
+    keyInsight: 'Principal barrera: 94-98% de trades son falsas rupturas',
     pair: 'ETH/USDC',
     rangeLower: '3000',
     rangeUpper: '3800',
@@ -445,9 +473,11 @@ export default function BacktestPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Backtest</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          Backtest de Cobertura IL
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Simulá estrategias de cobertura contra datos históricos de Binance
+          ¿Funciona cubrir Impermanent Loss con perpetuos? Simulá sobre datos reales y decidí.
         </p>
       </div>
 
@@ -461,34 +491,59 @@ export default function BacktestPage() {
             <Lightbulb className="size-4 text-yellow-400" />
             Escenarios Precargados
           </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            5 escenarios reales analizados. Cada uno muestra un comportamiento distinto de la
+            estrategia.
+          </p>
         </CardHeader>
         <CardContent>
-          <p className="text-xs text-muted-foreground mb-3">
-            Seleccioná un escenario para cargar los parámetros automáticamente. Después hacé click
-            en &quot;Ejecutar Backtest&quot;.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {PRESETS.map((preset) => (
               <button
                 key={preset.name}
                 type="button"
                 onClick={() => applyPreset(preset)}
-                className="text-left p-3 rounded-lg border border-border/50 hover:border-border hover:bg-muted/30 transition-colors"
+                className={`text-left p-3.5 rounded-lg border transition-all duration-200 hover:scale-[1.01] ${
+                  preset.verdict === 'works'
+                    ? 'border-green-500/30 hover:border-green-500/50 hover:bg-green-500/5'
+                    : preset.verdict === 'partial'
+                      ? 'border-yellow-500/30 hover:border-yellow-500/50 hover:bg-yellow-500/5'
+                      : preset.verdict === 'fails'
+                        ? 'border-red-500/30 hover:border-red-500/50 hover:bg-red-500/5'
+                        : 'border-border/50 hover:border-border hover:bg-muted/30'
+                }`}
               >
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-foreground">{preset.name}</span>
                   <span
-                    className={`size-2 rounded-full ${
-                      preset.icon === 'crash'
-                        ? 'bg-green-400'
-                        : preset.icon === 'neutral'
-                          ? 'bg-blue-400'
-                          : 'bg-orange-400'
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      preset.verdict === 'works'
+                        ? 'bg-green-500/15 text-green-400'
+                        : preset.verdict === 'partial'
+                          ? 'bg-yellow-500/15 text-yellow-400'
+                          : preset.verdict === 'fails'
+                            ? 'bg-red-500/15 text-red-400'
+                            : 'bg-muted text-muted-foreground'
                     }`}
-                  />
-                  <span className="text-xs font-medium text-foreground">{preset.name}</span>
+                  >
+                    {preset.verdictLabel}
+                  </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <p className="text-[11px] text-muted-foreground leading-relaxed mb-2.5">
                   {preset.description}
+                </p>
+                <div className="flex items-center justify-between border-t border-border/30 pt-2">
+                  <span className="text-[10px] text-muted-foreground/60">LP+Hedge esperado</span>
+                  <span
+                    className={`text-xs font-bold tabular-nums ${
+                      preset.expectedPnl.startsWith('+') ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {preset.expectedPnl}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/50 mt-1.5 italic">
+                  {preset.keyInsight}
                 </p>
               </button>
             ))}
@@ -747,10 +802,12 @@ export default function BacktestPage() {
 
       {/* ─── Results ─── */}
       <div ref={resultsRef} />
-      {result && <BacktestResults result={result} tradingEnabled={tradingEnabled} />}
-
-      {/* ─── Findings card ─── */}
-      {result && <FindingsCard result={result} />}
+      {result && (
+        <>
+          <BacktestResults result={result} tradingEnabled={tradingEnabled} />
+          <FindingsCard result={result} />
+        </>
+      )}
     </div>
   );
 }
@@ -829,6 +886,19 @@ function BacktestResults({
   const totalCombined = lpMetrics.netLpPnl + combinedStats.netPnl;
   const isProfit = totalCombined >= 0;
 
+  // Determine verdict for this result
+  const hedgeBeatLp = unifiedAnalysis
+    ? unifiedAnalysis.lpPlusHedgeFinalPnl > unifiedAnalysis.lpOnlyFinalPnl
+    : false;
+  const falseBreakoutRate = combinedStats.falseBreakoutRate;
+  const verdictInfo = (() => {
+    if (hedgeTrades.length === 0) return { label: 'Sin cobertura', color: 'text-muted-foreground', bg: 'bg-muted/50' };
+    if (isProfit && hedgeBeatLp) return { label: 'Cobertura funciona', color: 'text-green-400', bg: 'bg-green-500/15' };
+    if (hedgeBeatLp && !isProfit) return { label: 'Cobertura ayuda', color: 'text-yellow-400', bg: 'bg-yellow-500/15' };
+    if (!hedgeBeatLp && falseBreakoutRate > 50) return { label: 'Falsas rupturas', color: 'text-red-400', bg: 'bg-red-500/15' };
+    return { label: 'Cobertura no ayuda', color: 'text-red-400', bg: 'bg-red-500/15' };
+  })();
+
   return (
     <div className="space-y-6">
       {/* ─── Result banner ─── */}
@@ -851,11 +921,18 @@ function BacktestResults({
               )}
             </div>
             <div>
-              <p
-                className={`text-xl font-bold tabular-nums ${isProfit ? 'text-green-400' : 'text-red-400'}`}
-              >
-                {fmtUsd(totalCombined)}
-              </p>
+              <div className="flex items-center gap-2.5">
+                <p
+                  className={`text-xl font-bold tabular-nums ${isProfit ? 'text-green-400' : 'text-red-400'}`}
+                >
+                  {fmtUsd(totalCombined)}
+                </p>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${verdictInfo.bg} ${verdictInfo.color}`}
+                >
+                  {verdictInfo.label}
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground">Resultado combinado (LP + Cobertura)</p>
             </div>
           </div>
@@ -900,6 +977,49 @@ function BacktestResults({
           </span>
         </div>
       </div>
+
+      {/* ─── Strategy comparison visual ─── */}
+      {unifiedAnalysis && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { name: 'HODL', pnl: unifiedAnalysis.hodlFinalPnl, icon: '📊' },
+            { name: 'LP Solo', pnl: unifiedAnalysis.lpOnlyFinalPnl, icon: '💧' },
+            { name: 'LP + Hedge', pnl: unifiedAnalysis.lpPlusHedgeFinalPnl, icon: '🛡️' },
+          ].map((s) => {
+            const best =
+              s.pnl ===
+              Math.max(
+                unifiedAnalysis.hodlFinalPnl,
+                unifiedAnalysis.lpOnlyFinalPnl,
+                unifiedAnalysis.lpPlusHedgeFinalPnl,
+              );
+            return (
+              <div
+                key={s.name}
+                className={`rounded-lg border p-4 text-center transition-colors ${
+                  best
+                    ? 'border-blue-500/30 bg-blue-500/5'
+                    : 'border-border/30 bg-card/30'
+                }`}
+              >
+                <p className="text-[11px] font-medium text-muted-foreground mb-1">{s.name}</p>
+                <p
+                  className={`text-lg font-bold tabular-nums ${
+                    s.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}
+                >
+                  {fmtUsd(s.pnl)}
+                </p>
+                {best && (
+                  <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wider">
+                    Mejor
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ─── LP metrics cards ─── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1614,57 +1734,163 @@ function LpChart({ snapshots }: { snapshots: LpSnapshot[] }) {
 
 function EducationalCard() {
   return (
-    <Card className="border-blue-500/20 bg-blue-500/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <BookOpen className="size-4 text-blue-400" />
-          ¿Qué hace este backtest?
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 text-xs text-muted-foreground leading-relaxed">
-        <p>Este simulador compara tres estrategias sobre datos históricos reales de Binance:</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="p-3 rounded-lg bg-card/50 border border-border/30">
-            <p className="font-medium text-foreground mb-1">HODL</p>
-            <p>Simplemente mantener el activo sin proveer liquidez. Línea base.</p>
-          </div>
-          <div className="p-3 rounded-lg bg-card/50 border border-border/30">
-            <p className="font-medium text-foreground mb-1">LP Solo</p>
-            <p>
-              Proveer liquidez concentrada. Gana fees pero sufre Impermanent Loss cuando el precio
-              sale del rango.
-            </p>
-          </div>
-          <div className="p-3 rounded-lg bg-card/50 border border-border/30">
-            <p className="font-medium text-foreground mb-1">LP + Cobertura</p>
-            <p>
-              Proveer liquidez + abrir shorts con perpetuos cuando el precio rompe el rango. El
-              hedge compensa la IL.
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-border/30 pt-3 space-y-1.5">
-          <p className="flex items-start gap-2">
-            <CheckCircle2 className="size-3.5 text-green-400 mt-0.5 shrink-0" />
-            <span>
-              <strong className="text-foreground">Funciona bien</strong> cuando el precio rompe el
-              rango con fuerza y se mantiene afuera (crashes, correcciones sostenidas).
-            </span>
+    <div className="space-y-4">
+      {/* Main explanation */}
+      <Card className="border-blue-500/20 bg-blue-500/5 overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <BookOpen className="size-4 text-blue-400" />
+            ¿Qué hace este backtest?
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-xs text-muted-foreground leading-relaxed">
+          <p>
+            Simulador que compara <strong className="text-foreground">tres estrategias</strong>{' '}
+            sobre datos históricos reales (velas de 1 minuto de Binance). Probá los escenarios
+            precargados para ver cuándo funciona la cobertura y cuándo no.
           </p>
-          <p className="flex items-start gap-2">
-            <XCircle className="size-3.5 text-red-400 mt-0.5 shrink-0" />
-            <span>
-              <strong className="text-foreground">No funciona bien</strong> cuando el precio oscila
-              alrededor del borde del rango (falsas rupturas) o se mueve gradualmente.
-            </span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-card/50 border border-border/30">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="size-2 rounded-full bg-yellow-400" />
+                <p className="font-semibold text-foreground text-xs">HODL</p>
+              </div>
+              <p>Mantener el activo sin proveer liquidez. Línea base de referencia.</p>
+            </div>
+            <div className="p-3 rounded-lg bg-card/50 border border-border/30">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="size-2 rounded-full bg-red-400" />
+                <p className="font-semibold text-foreground text-xs">LP Solo</p>
+              </div>
+              <p>
+                Liquidez concentrada en Uniswap V3. Gana fees pero sufre Impermanent Loss cuando
+                el precio sale del rango.
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-card/50 border border-border/30">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="size-2 rounded-full bg-blue-400" />
+                <p className="font-semibold text-foreground text-xs">LP + Cobertura</p>
+              </div>
+              <p>
+                LP + shorts con perpetuos en Hyperliquid cuando el precio rompe el rango. El
+                hedge intenta compensar la IL.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Honest assessment */}
+      <Card className="border-border/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Shield className="size-4 text-muted-foreground" />
+            Evaluación honesta — 5 escenarios analizados
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-xs text-muted-foreground leading-relaxed">
+          {/* Verdict matrix */}
+          <div className="grid grid-cols-1 gap-1.5">
+            {[
+              {
+                scenario: 'Crash sostenido',
+                example: 'FTX Nov 2022',
+                verdict: 'Funciona',
+                color: 'text-green-400',
+                bg: 'bg-green-500/10',
+                detail: 'Short captura la caída, cubre >80% del IL',
+              },
+              {
+                scenario: 'Corrección con rebotes',
+                example: 'Abr 2024',
+                verdict: 'Parcial',
+                color: 'text-yellow-400',
+                bg: 'bg-yellow-500/10',
+                detail: 'Funciona por funding rate, no por el hedge en sí',
+              },
+              {
+                scenario: 'Mercado lateral',
+                example: 'Jun 2024',
+                verdict: 'Irrelevante',
+                color: 'text-muted-foreground',
+                bg: 'bg-muted/50',
+                detail: 'No se activa la cobertura, LP sola',
+              },
+              {
+                scenario: 'Rally sostenido',
+                example: 'Feb 2024',
+                verdict: 'No funciona',
+                color: 'text-red-400',
+                bg: 'bg-red-500/10',
+                detail: 'Long en ruptura al alza pierde — LP ya está en stablecoin',
+              },
+              {
+                scenario: 'Falsas rupturas',
+                example: 'Abr-May 2024',
+                verdict: 'No funciona',
+                color: 'text-red-400',
+                bg: 'bg-red-500/10',
+                detail: '98% false breakouts → fees acumulados destruyen PnL',
+              },
+            ].map((row) => (
+              <div
+                key={row.scenario}
+                className={`flex items-center gap-3 px-3 py-2 rounded-md ${row.bg}`}
+              >
+                <span className={`text-[10px] font-bold w-24 shrink-0 ${row.color}`}>
+                  {row.verdict}
+                </span>
+                <span className="text-foreground font-medium w-36 shrink-0">{row.scenario}</span>
+                <span className="text-muted-foreground/60 hidden md:inline">{row.detail}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Key barriers */}
+          <div className="border-t border-border/30 pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              Principales barreras identificadas
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div className="flex items-start gap-2">
+                <Flame className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-foreground">Falsas rupturas (94-98%)</strong> — El precio
+                  oscila en el borde del rango, cada open/close acumula fees sin beneficio.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <ArrowDown className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-foreground">Asimetría direccional</strong> — Cubrir
+                  rupturas al alza es innecesario (LP ya es 100% stablecoin arriba del rango).
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Clock className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-foreground">Funding rate variable</strong> — En crashes
+                  los shorts cobran funding, pero no es constante ni garantizado.
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Wrench className="size-3.5 text-blue-400 mt-0.5 shrink-0" />
+                <span>
+                  <strong className="text-foreground">Mejora posible</strong> — Solo cubrir hacia
+                  abajo + debounce 5 + cooldown 600s + trailing stop reduciría pérdidas.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground/50 border-t border-border/20 pt-2">
+            Estos resultados son sobre $10,000 pool con parámetros por defecto. Probá los
+            escenarios precargados para explorar cada caso, o configurá tus propios parámetros.
           </p>
-        </div>
-        <p className="text-[11px] text-muted-foreground/60">
-          Usá los escenarios precargados para ver ejemplos de cada caso, o configurá tus propios
-          parámetros.
-        </p>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1810,32 +2036,67 @@ function FindingsCard({ result }: { result: BacktestResult }) {
 
   if (findings.length === 0) return null;
 
+  const diagnostics = findings.filter((f) => f.type === 'positive' || f.type === 'neutral');
+  const barriers = findings.filter((f) => f.type === 'warning');
+  const solutions = findings.filter((f) => f.type === 'solution');
+
+  const renderFinding = (f: (typeof findings)[0], i: number) => (
+    <div key={i} className="flex items-start gap-2.5 text-xs leading-relaxed">
+      {f.type === 'positive' && (
+        <CheckCircle2 className="size-3.5 text-green-400 mt-0.5 shrink-0" />
+      )}
+      {f.type === 'warning' && (
+        <AlertTriangle className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
+      )}
+      {f.type === 'neutral' && <Info className="size-3.5 text-blue-400 mt-0.5 shrink-0" />}
+      {f.type === 'solution' && (
+        <Lightbulb className="size-3.5 text-yellow-400 mt-0.5 shrink-0" />
+      )}
+      <span className={f.type === 'solution' ? 'text-foreground/80' : 'text-muted-foreground'}>
+        {f.text}
+      </span>
+    </div>
+  );
+
   return (
     <Card className="border-muted">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Info className="size-4 text-blue-400" />
-          Interpretación
+          Interpretación del Resultado
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {findings.map((f, i) => (
-          <div key={i} className="flex items-start gap-2.5 text-xs leading-relaxed">
-            {f.type === 'positive' && (
-              <CheckCircle2 className="size-3.5 text-green-400 mt-0.5 shrink-0" />
-            )}
-            {f.type === 'warning' && (
-              <AlertTriangle className="size-3.5 text-orange-400 mt-0.5 shrink-0" />
-            )}
-            {f.type === 'neutral' && <Info className="size-3.5 text-blue-400 mt-0.5 shrink-0" />}
-            {f.type === 'solution' && (
-              <Lightbulb className="size-3.5 text-yellow-400 mt-0.5 shrink-0" />
-            )}
-            <span className={f.type === 'solution' ? 'text-foreground/80' : 'text-muted-foreground'}>
-              {f.text}
-            </span>
+      <CardContent className="space-y-4">
+        {/* Diagnostics */}
+        {diagnostics.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+              Diagnóstico
+            </p>
+            {diagnostics.map(renderFinding)}
           </div>
-        ))}
+        )}
+
+        {/* Barriers */}
+        {barriers.length > 0 && (
+          <div className="space-y-2">
+            {diagnostics.length > 0 && <Separator className="opacity-30" />}
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/60">
+              Barreras Detectadas
+            </p>
+            {barriers.map(renderFinding)}
+          </div>
+        )}
+
+        {/* Solutions */}
+        {solutions.length > 0 && (
+          <div className="space-y-2 bg-yellow-500/5 -mx-6 px-6 py-3 border-t border-b border-yellow-500/10">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-yellow-400/80">
+              Mejoras Posibles
+            </p>
+            {solutions.map(renderFinding)}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
