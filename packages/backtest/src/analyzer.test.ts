@@ -9,6 +9,7 @@ function makeTrade(overrides: Partial<Trade> = {}): Trade {
     size: 1,
     pnl: 50,
     fees: 0.5,
+    fundingPnl: 0,
     entryTime: 1000,
     exitTime: 2000,
     closeReason: 'range_return',

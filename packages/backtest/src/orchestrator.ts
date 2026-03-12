@@ -31,6 +31,12 @@ export interface BacktestConfig {
   hedgeRatio: number;
   debounceCount: number;
   cooldownSeconds: number; // per-pool hedge cooldown
+  /**
+   * Perpetual funding rate per hour (as a fraction, e.g. 0.000_0125 = 0.00125%/h).
+   * Default: 0.01% per 8h = 0.000_0125/h. Shorts pay longs in normal contango.
+   * Negative fundingPnl = cost to the hedge position.
+   */
+  fundingRatePerHour?: number;
   // Range trading params (optional, null = hedge-only mode)
   trading?: {
     enabled: boolean;
@@ -234,8 +240,10 @@ export async function runBacktest(
   forceCloseOpenRangeTrades(rangeTradesRepo, poolConfig.id, lastPrice, lastTimestamp);
 
   // Collect results from DB
-  const hedgeTrades = collectHedgeTrades(hedgesRepo, poolConfig.id, prices);
-  const rangeTrades = collectRangeTrades(rangeTradesRepo, poolConfig.id, prices);
+  // Default funding rate: 0.01% per 8h = 0.00125% per hour = 0.0000125 per hour
+  const fundingRate = config.fundingRatePerHour ?? 0.000_012_5;
+  const hedgeTrades = collectHedgeTrades(hedgesRepo, poolConfig.id, prices, fundingRate);
+  const rangeTrades = collectRangeTrades(rangeTradesRepo, poolConfig.id, prices, fundingRate);
 
   db.close();
 
@@ -319,6 +327,7 @@ function collectHedgeTrades(
   hedgesRepo: HedgesRepository,
   poolConfigId: string,
   prices: PricePoint[],
+  fundingRatePerHour: number,
 ): Trade[] {
   const allHedges = hedgesRepo.findByPool(poolConfigId);
   const lastPrice = prices[prices.length - 1].price;
@@ -334,6 +343,16 @@ function collectHedgeTrades(
       pnl = (exitPrice - entryPrice) * size;
     }
 
+    // Funding cost: position notional × rate × hours held
+    // In normal contango, shorts pay funding → negative PnL for short hedges
+    const entryTime = h.openedAt;
+    const exitTime = h.closedAt ?? h.openedAt;
+    const hoursHeld = (exitTime - entryTime) / 3_600_000;
+    const avgNotional = ((entryPrice + exitPrice) / 2) * size;
+    // Shorts pay in contango (positive rate), longs receive
+    const fundingSign = h.side === 'short' ? -1 : 1;
+    const fundingPnl = fundingSign * avgNotional * fundingRatePerHour * hoursHeld;
+
     return {
       side: h.side as 'long' | 'short',
       entryPrice,
@@ -341,8 +360,9 @@ function collectHedgeTrades(
       size,
       pnl,
       fees: parseFloat(h.fees || '0'),
-      entryTime: h.openedAt,
-      exitTime: h.closedAt ?? h.openedAt,
+      fundingPnl,
+      entryTime,
+      exitTime,
       closeReason: h.closeReason ?? 'unknown',
       isFalseBreakout: !!h.isFalseBreakout,
     };
@@ -353,6 +373,7 @@ function collectRangeTrades(
   rangeTradesRepo: RangeTradesRepository,
   poolConfigId: string,
   prices: PricePoint[],
+  fundingRatePerHour: number,
 ): Trade[] {
   const allTrades = rangeTradesRepo.findByPool(poolConfigId);
   const lastPrice = prices[prices.length - 1].price;
@@ -368,6 +389,13 @@ function collectRangeTrades(
       pnl = (entryPrice - exitPrice) * size;
     }
 
+    const entryTime = t.openedAt;
+    const exitTime = t.closedAt ?? t.openedAt;
+    const hoursHeld = (exitTime - entryTime) / 3_600_000;
+    const avgNotional = ((entryPrice + exitPrice) / 2) * size;
+    const fundingSign = t.side === 'short' ? -1 : 1;
+    const fundingPnl = fundingSign * avgNotional * fundingRatePerHour * hoursHeld;
+
     return {
       side: t.side as 'long' | 'short',
       entryPrice,
@@ -375,8 +403,9 @@ function collectRangeTrades(
       size,
       pnl,
       fees: parseFloat(t.fees || '0'),
-      entryTime: t.openedAt,
-      exitTime: t.closedAt ?? t.openedAt,
+      fundingPnl,
+      entryTime,
+      exitTime,
       closeReason: t.closeReason ?? 'unknown',
       isFalseBreakout: false,
     };

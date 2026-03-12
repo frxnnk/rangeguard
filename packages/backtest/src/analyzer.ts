@@ -5,6 +5,7 @@ export interface Trade {
   size: number;
   pnl: number;
   fees: number;
+  fundingPnl: number; // funding rate cost (negative = paid, positive = received)
   entryTime: number;
   exitTime: number;
   closeReason: string;
@@ -51,7 +52,8 @@ export function analyze(trades: Trade[], initialEquity: number = 10_000): Backte
 
   const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
   const totalFees = trades.reduce((s, t) => s + t.fees, 0);
-  const netPnl = totalPnl - totalFees;
+  const totalFunding = trades.reduce((s, t) => s + t.fundingPnl, 0);
+  const netPnl = totalPnl - totalFees + totalFunding;
 
   const grossWins = winTrades.reduce((s, t) => s + t.pnl, 0);
   const grossLosses = Math.abs(lossTrades.reduce((s, t) => s + t.pnl, 0));
@@ -60,7 +62,7 @@ export function analyze(trades: Trade[], initialEquity: number = 10_000): Backte
   const equityCurve: EquityPoint[] = [{ timestamp: trades[0].entryTime, equity: initialEquity }];
   let equity = initialEquity;
   for (const trade of trades) {
-    equity += trade.pnl - trade.fees;
+    equity += trade.pnl - trade.fees + trade.fundingPnl;
     equityCurve.push({ timestamp: trade.exitTime, equity });
   }
 
@@ -78,7 +80,7 @@ export function analyze(trades: Trade[], initialEquity: number = 10_000): Backte
   }
 
   // Sharpe ratio (daily returns approximation)
-  const returns = trades.map((t) => (t.pnl - t.fees) / initialEquity);
+  const returns = trades.map((t) => (t.pnl - t.fees + t.fundingPnl) / initialEquity);
   const sharpeRatio = computeSharpe(returns);
 
   // Average holding time

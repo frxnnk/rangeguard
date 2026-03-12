@@ -118,6 +118,7 @@ export function generateMarkdownReport(data: ReportData): string {
     lines.push(`| IL during active hedges | $${ua.totalIlDuringHedges.toFixed(2)} |`);
     lines.push(`| Total Hedge PnL | $${ua.totalHedgePnl.toFixed(2)} |`);
     lines.push(`| Hedge fees | $${ua.totalHedgeFees.toFixed(2)} |`);
+    lines.push(`| Funding costs | $${ua.totalHedgeFunding.toFixed(2)} |`);
     lines.push(`| Net hedge effect | $${ua.netHedgeEffect.toFixed(2)} |`);
     lines.push(
       `| Hedging effectiveness | ${ua.hedgingEffectivenessRatio.toFixed(2)}x ${ua.hedgingEffectivenessRatio >= 1 ? '(hedge covers IL)' : '(partial coverage)'} |`,

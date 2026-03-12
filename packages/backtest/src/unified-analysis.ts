@@ -18,9 +18,10 @@ export interface HedgeIlCorrelation {
   exitPrice: number;
   hedgePnl: number;
   hedgeFees: number;
+  hedgeFunding: number; // funding rate PnL (negative = cost)
   ilDuringHedge: number; // IL delta during [entryTime, exitTime] (≤ 0 if price moved)
-  netEffect: number; // hedgePnl + ilDuringHedge (positive = hedge helped)
-  hedgeEffectiveness: number; // hedgePnl / abs(ilDuringHedge) — >1 means over-hedged
+  netEffect: number; // hedgePnl + ilDuringHedge - fees + funding (positive = hedge helped)
+  hedgeEffectiveness: number; // (hedgePnl - fees + funding) / abs(ilDuringHedge) — >1 means over-hedged
 }
 
 export interface EquityCurvePoint {
@@ -38,9 +39,10 @@ export interface UnifiedAnalysis {
   totalIlDuringHedges: number;
   totalHedgePnl: number;
   totalHedgeFees: number;
+  totalHedgeFunding: number; // total funding PnL across all hedges
   netHedgeEffect: number;
-  hedgingEffectivenessRatio: number; // totalHedgePnl / abs(totalIlDuringHedges)
-  ilCoveredPercent: number; // % of total IL offset by hedges
+  hedgingEffectivenessRatio: number; // net hedge gain / abs(totalIlDuringHedges)
+  ilCoveredPercent: number; // % of total IL offset by hedges (after fees+funding)
 
   // Full-period LP metrics
   totalIl: number;
@@ -107,10 +109,13 @@ export function analyzeUnified(
 
     const hedgePnl = trade.pnl;
     const hedgeFees = trade.fees;
-    const netEffect = hedgePnl + ilDuringHedge;
+    const hedgeFunding = trade.fundingPnl;
+    // Net effect includes IL offset + all hedge costs
+    const hedgeNetGain = hedgePnl - hedgeFees + hedgeFunding;
+    const netEffect = hedgeNetGain + ilDuringHedge;
 
     const absIl = Math.abs(ilDuringHedge);
-    const hedgeEffectiveness = absIl > 0.01 ? hedgePnl / absIl : 0;
+    const hedgeEffectiveness = absIl > 0.01 ? hedgeNetGain / absIl : 0;
 
     return {
       tradeIndex: i + 1,
@@ -121,6 +126,7 @@ export function analyzeUnified(
       exitPrice: trade.exitPrice,
       hedgePnl,
       hedgeFees,
+      hedgeFunding,
       ilDuringHedge,
       netEffect,
       hedgeEffectiveness,
@@ -131,23 +137,23 @@ export function analyzeUnified(
   const totalIlDuringHedges = correlations.reduce((s, c) => s + c.ilDuringHedge, 0);
   const totalHedgePnl = correlations.reduce((s, c) => s + c.hedgePnl, 0);
   const totalHedgeFees = correlations.reduce((s, c) => s + c.hedgeFees, 0);
-  const netHedgeEffect = totalHedgePnl + totalIlDuringHedges;
+  const totalHedgeFunding = correlations.reduce((s, c) => s + c.hedgeFunding, 0);
+  const hedgeNetGain = totalHedgePnl - totalHedgeFees + totalHedgeFunding;
+  const netHedgeEffect = hedgeNetGain + totalIlDuringHedges;
 
   const absIlDuringHedges = Math.abs(totalIlDuringHedges);
-  const hedgingEffectivenessRatio = absIlDuringHedges > 0.01 ? totalHedgePnl / absIlDuringHedges : 0;
+  const hedgingEffectivenessRatio = absIlDuringHedges > 0.01 ? hedgeNetGain / absIlDuringHedges : 0;
 
-  // IL covered: only meaningful when hedge gains offset IL losses
-  // If hedge PnL is negative, it didn't cover any IL
+  // IL covered: only meaningful when net hedge gain offsets IL losses
   const absTotalIl = Math.abs(lpMetrics.totalIL);
   let ilCoveredPercent = 0;
-  if (totalHedgePnl > 0 && absTotalIl > 0.01) {
-    ilCoveredPercent = Math.min((totalHedgePnl / absTotalIl) * 100, 999);
+  if (hedgeNetGain > 0 && absTotalIl > 0.01) {
+    ilCoveredPercent = Math.min((hedgeNetGain / absTotalIl) * 100, 999);
   }
 
   // ── Final PnL comparison ─────────────────────────────────────
   const lpOnlyFinalPnl = lpMetrics.netLpPnl;
-  const hedgeNetPnl = totalHedgePnl - totalHedgeFees;
-  const lpPlusHedgeFinalPnl = lpOnlyFinalPnl + hedgeNetPnl;
+  const lpPlusHedgeFinalPnl = lpOnlyFinalPnl + hedgeNetGain;
 
   const initial = tokenAmounts(L, entryPrice, rangeLower, rangeUpper);
   const startValue = initial.amount0 * entryPrice + initial.amount1;
@@ -161,6 +167,7 @@ export function analyzeUnified(
     totalIlDuringHedges,
     totalHedgePnl,
     totalHedgeFees,
+    totalHedgeFunding,
     netHedgeEffect,
     hedgingEffectivenessRatio,
     ilCoveredPercent,
@@ -197,7 +204,8 @@ function buildEquityCurve(
   for (const snap of snapshots) {
     // Accumulate hedge PnL for trades closed before this snapshot
     while (tradeIdx < sortedTrades.length && sortedTrades[tradeIdx].exitTime <= snap.timestamp) {
-      cumulativeHedgePnl += sortedTrades[tradeIdx].pnl - sortedTrades[tradeIdx].fees;
+      const t = sortedTrades[tradeIdx];
+      cumulativeHedgePnl += t.pnl - t.fees + t.fundingPnl;
       tradeIdx++;
     }
 

@@ -217,6 +217,7 @@ interface Trade {
   size: number;
   pnl: number;
   fees: number;
+  fundingPnl: number;
   entryTime: number;
   exitTime: number;
   closeReason: string;
@@ -232,6 +233,7 @@ interface LpSnapshot {
   ilPercent: number;
   accumulatedFees: number;
   netLpPnl: number;
+  inRange: boolean;
 }
 
 interface LpMetrics {
@@ -245,6 +247,7 @@ interface LpMetrics {
   ilPercent: number;
   totalFees: number;
   netLpPnl: number;
+  timeInRangePercent: number;
   snapshots: LpSnapshot[];
 }
 
@@ -255,6 +258,7 @@ interface HedgeIlCorrelation {
   exitPrice: number;
   hedgePnl: number;
   hedgeFees: number;
+  hedgeFunding: number;
   ilDuringHedge: number;
   netEffect: number;
   hedgeEffectiveness: number;
@@ -272,6 +276,7 @@ interface UnifiedAnalysis {
   totalIlDuringHedges: number;
   totalHedgePnl: number;
   totalHedgeFees: number;
+  totalHedgeFunding: number;
   netHedgeEffect: number;
   hedgingEffectivenessRatio: number;
   ilCoveredPercent: number;
@@ -926,6 +931,7 @@ function BacktestResults({
         <MetricCard
           label="Fees LP estimados"
           value={fmtUsd(lpMetrics.totalFees)}
+          sub={`${(lpMetrics.timeInRangePercent ?? 100).toFixed(0)}% en rango`}
           icon={Coins}
           accent="text-green-400"
         />
@@ -1268,6 +1274,11 @@ function HedgeIlMetrics({ analysis }: { analysis: UnifiedAnalysis }) {
     {
       label: 'Fees coberturas',
       value: fmtUsdNeutral(analysis.totalHedgeFees),
+    },
+    {
+      label: 'Costo funding',
+      value: fmtUsd(analysis.totalHedgeFunding),
+      color: analysis.totalHedgeFunding >= 0 ? 'text-green-400' : 'text-red-400',
     },
     {
       label: 'Efecto neto cobertura',

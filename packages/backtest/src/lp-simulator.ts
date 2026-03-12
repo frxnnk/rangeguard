@@ -4,6 +4,9 @@
  *
  * Uses floating-point math with human-readable prices (not Q96 bigints)
  * since we only need approximate values for backtest analysis.
+ *
+ * IMPORTANT: Fees only accrue when price is IN-RANGE. An out-of-range
+ * position earns zero trading fees.
  */
 
 export interface LpConfig {
@@ -23,6 +26,7 @@ export interface LpSnapshot {
   ilPercent: number;
   accumulatedFees: number;
   netLpPnl: number; // il + fees (can be positive if fees > IL)
+  inRange: boolean;
 }
 
 export interface LpMetrics {
@@ -36,6 +40,7 @@ export interface LpMetrics {
   ilPercent: number;
   totalFees: number;
   netLpPnl: number; // totalIL + totalFees
+  timeInRangePercent: number;
   snapshots: LpSnapshot[];
 }
 
@@ -118,6 +123,8 @@ export function positionValue(
 /**
  * Simulate an LP position across a series of price points.
  * Returns IL, fee estimates, and snapshots at each point.
+ *
+ * Fees only accrue when price is within [rangeLower, rangeUpper].
  */
 export function simulateLp(
   config: LpConfig,
@@ -138,26 +145,42 @@ export function simulateLp(
   const initial = tokenAmounts(L, entryPrice, rangeLower, rangeUpper);
   const startValue = initial.amount0 * entryPrice + initial.amount1;
 
-  // Fee accrual rate: per millisecond
+  // Fee accrual rate: per millisecond (only when in-range)
   const dailyFees = poolAmountUsd * (feeAprPercent / 100) / 365;
   const msPerDay = 86_400_000;
+  const feeRatePerMs = dailyFees / msPerDay;
 
-  const startTime = prices[0].timestamp;
   const snapshots: LpSnapshot[] = [];
 
-  // Sample snapshots (every ~100 points to avoid huge arrays)
+  // Track cumulative fees and in-range time by iterating ALL price points
+  let accumulatedFees = 0;
+  let inRangeMs = 0;
+  let prevTimestamp = prices[0].timestamp;
+  const totalElapsed = prices[prices.length - 1].timestamp - prices[0].timestamp;
+
+  // Sample snapshots (every ~step points to avoid huge arrays)
   const step = Math.max(1, Math.floor(prices.length / 500));
 
-  for (let i = 0; i < prices.length; i += step) {
+  for (let i = 0; i < prices.length; i++) {
     const { timestamp, price } = prices[i];
-    const elapsed = timestamp - startTime;
+    const dt = timestamp - prevTimestamp;
+    const inRange = price >= rangeLower && price <= rangeUpper;
+
+    // Only accrue fees when in-range
+    if (inRange && dt > 0) {
+      accumulatedFees += feeRatePerMs * dt;
+      inRangeMs += dt;
+    }
+
+    prevTimestamp = timestamp;
+
+    // Only emit snapshots at sampled intervals
+    if (i % step !== 0 && i !== prices.length - 1) continue;
 
     const currentValue = positionValue(L, price, rangeLower, rangeUpper);
     const hodl = initial.amount0 * price + initial.amount1;
     const il = currentValue - hodl;
     const ilPct = hodl !== 0 ? (il / hodl) * 100 : 0;
-    const fees = dailyFees * (elapsed / msPerDay);
-    const netLp = il + fees;
 
     snapshots.push({
       timestamp,
@@ -166,18 +189,18 @@ export function simulateLp(
       hodlValue: hodl,
       il,
       ilPercent: ilPct,
-      accumulatedFees: fees,
-      netLpPnl: netLp,
+      accumulatedFees,
+      netLpPnl: il + accumulatedFees,
+      inRange,
     });
   }
 
-  // Always include the last point
+  // Final metrics
   const last = prices[prices.length - 1];
-  const totalElapsed = last.timestamp - startTime;
   const finalValue = positionValue(L, last.price, rangeLower, rangeUpper);
   const finalHodl = initial.amount0 * last.price + initial.amount1;
   const totalIL = finalValue - finalHodl;
-  const totalFees = dailyFees * (totalElapsed / msPerDay);
+  const timeInRangePercent = totalElapsed > 0 ? (inRangeMs / totalElapsed) * 100 : 100;
 
   return {
     entryPrice,
@@ -188,8 +211,9 @@ export function simulateLp(
     hodlValueEnd: finalHodl,
     totalIL,
     ilPercent: finalHodl !== 0 ? (totalIL / finalHodl) * 100 : 0,
-    totalFees,
-    netLpPnl: totalIL + totalFees,
+    totalFees: accumulatedFees,
+    netLpPnl: totalIL + accumulatedFees,
+    timeInRangePercent,
     snapshots,
   };
 }
@@ -206,6 +230,7 @@ function emptyMetrics(config: LpConfig): LpMetrics {
     ilPercent: 0,
     totalFees: 0,
     netLpPnl: 0,
+    timeInRangePercent: 100,
     snapshots: [],
   };
 }
