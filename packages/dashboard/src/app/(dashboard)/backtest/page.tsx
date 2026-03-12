@@ -92,7 +92,7 @@ const PRESETS: Preset[] = [
   {
     name: 'FTX Crash (Nov 2022)',
     description:
-      'ETH $1570→$1100 en días. IL cubierto 80%. LP+Hedge pierde $241 vs LP solo pierde $1.452.',
+      'ETH $1570→$1100 en días. Crash fuerte y sostenido. Mejor caso para la cobertura — el short gana mientras el LP sufre IL.',
     icon: 'crash',
     pair: 'ETH/USDC',
     rangeLower: '1400',
@@ -109,8 +109,8 @@ const PRESETS: Preset[] = [
   {
     name: 'Rally ETH (Feb 2024)',
     description:
-      'ETH $2300→$3500 en un mes. IL cubierto 52%. Cobertura también funciona con rupturas al alza.',
-    icon: 'crash',
+      'ETH $2300→$3500 en un mes. Ruptura al alza sostenida. El short pierde — la cobertura NO funciona en rallies.',
+    icon: 'warning',
     pair: 'ETH/USDC',
     rangeLower: '2200',
     rangeUpper: '2800',
@@ -125,7 +125,8 @@ const PRESETS: Preset[] = [
   },
   {
     name: 'Corrección Abr 2024',
-    description: 'ETH $3640→$2880. IL cubierto 28%. Cobertura parcial con algunas falsas rupturas.',
+    description:
+      'ETH $3640→$2880. Corrección parcial con rebotes. Cobertura parcial, falsas rupturas restan valor.',
     icon: 'neutral',
     pair: 'ETH/USDC',
     rangeLower: '3200',
@@ -142,8 +143,8 @@ const PRESETS: Preset[] = [
   {
     name: 'Mercado lateral (Jun 2024)',
     description:
-      'Precio dentro del rango todo el período. 0 coberturas necesarias. LP gana fees tranquilamente.',
-    icon: 'neutral',
+      'Precio dentro del rango todo el período. 0 coberturas necesarias. LP gana fees sin IL.',
+    icon: 'crash',
     pair: 'ETH/USDC',
     rangeLower: '3300',
     rangeUpper: '3900',
@@ -159,7 +160,7 @@ const PRESETS: Preset[] = [
   {
     name: 'Falsas rupturas (Abr 2024)',
     description:
-      'Precio oscila alrededor del borde 45 días. 98% falsas rupturas. Escenario donde NO funciona.',
+      'Precio oscila en el borde del rango 45 días. Muchas falsas rupturas. Escenario donde la cobertura pierde por fees acumulados.',
     icon: 'warning',
     pair: 'ETH/USDC',
     rangeLower: '3000',
