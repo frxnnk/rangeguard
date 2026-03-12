@@ -1684,10 +1684,18 @@ function FindingsCard({ result }: { result: BacktestResult }) {
 
   // No trades at all
   if (combinedStats.totalTrades === 0) {
-    findings.push({
-      type: 'neutral',
-      text: 'El precio se mantuvo dentro del rango durante todo el período. No se necesitaron coberturas. LP ganó fees sin IL significativo.',
-    });
+    const lpNet = lpMetrics.totalFees - Math.abs(lpMetrics.totalIL);
+    if (lpNet >= 0) {
+      findings.push({
+        type: 'positive',
+        text: `Precio dentro del rango — 0 coberturas necesarias. LP ganó ${fmtUsdNeutral(lpMetrics.totalFees)} en fees con solo ${fmtUsdNeutral(Math.abs(lpMetrics.totalIL))} de IL. Resultado neto LP: ${fmtUsd(lpNet)}.`,
+      });
+    } else {
+      findings.push({
+        type: 'neutral',
+        text: `Precio dentro del rango — 0 coberturas necesarias. Pero LP perdió ${fmtUsd(lpNet)} neto (fees ${fmtUsdNeutral(lpMetrics.totalFees)} no cubrieron IL de ${fmtUsdNeutral(Math.abs(lpMetrics.totalIL))}).`,
+      });
+    }
   }
 
   // IL coverage
@@ -1792,11 +1800,11 @@ function FindingsCard({ result }: { result: BacktestResult }) {
     });
   }
 
-  // IL is negligible
-  if (Math.abs(lpMetrics.ilPercent) < 0.5 && combinedStats.totalTrades === 0) {
+  // IL is negligible AND fees cover it
+  if (Math.abs(lpMetrics.ilPercent) < 0.5 && combinedStats.totalTrades === 0 && lpMetrics.totalFees > Math.abs(lpMetrics.totalIL)) {
     findings.push({
       type: 'positive',
-      text: 'IL prácticamente nulo. El precio se mantuvo dentro del rango — escenario ideal para LP.',
+      text: 'IL prácticamente nulo y fees lo cubren con creces — escenario ideal para LP.',
     });
   }
 
