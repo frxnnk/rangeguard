@@ -52,11 +52,9 @@ import {
 
 const PAIRS = ['ETH/USDC', 'BTC/USDC', 'SOL/USDC', 'ARB/USDC', 'LINK/USDC'];
 const PERIODS = [
+  { value: '3d', label: '3 días' },
   { value: '1w', label: '1 semana' },
   { value: '2w', label: '2 semanas' },
-  { value: '1m', label: '1 mes' },
-  { value: '3m', label: '3 meses' },
-  { value: '6m', label: '6 meses' },
 ];
 
 const CHART_COLORS = {
@@ -165,7 +163,7 @@ export default function BacktestPage() {
   const [pair, setPair] = useState('ETH/USDC');
   const [rangeLower, setRangeLower] = useState('');
   const [rangeUpper, setRangeUpper] = useState('');
-  const [period, setPeriod] = useState('1m');
+  const [period, setPeriod] = useState('1w');
   const [poolAmountUsd, setPoolAmountUsd] = useState('10000');
   const [leverage, setLeverage] = useState('10');
   const [hedgeRatio, setHedgeRatio] = useState('1.0');
@@ -240,7 +238,7 @@ export default function BacktestPage() {
             {/* Section: Mercado */}
             <div>
               <SectionLabel>Mercado</SectionLabel>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3 max-w-3xl">
                 <FieldGroup label="Par">
                   <Select value={pair} onValueChange={setPair}>
                     <SelectTrigger>
@@ -293,7 +291,7 @@ export default function BacktestPage() {
             {/* Section: Parámetros */}
             <div>
               <SectionLabel>Parámetros</SectionLabel>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-3 max-w-3xl">
                 <FieldGroup label="Monto pool (USD)">
                   <Input
                     type="number"
@@ -337,7 +335,7 @@ export default function BacktestPage() {
                 Ajuste fino
               </button>
               {showAdvanced && (
-                <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mt-3">
+                <div className="grid grid-cols-2 gap-4 mt-3 max-w-md">
                   <FieldGroup label="Debounce (señales)">
                     <Input
                       type="number"
@@ -381,7 +379,7 @@ export default function BacktestPage() {
               </div>
 
               {tradingEnabled && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pl-0 md:pl-10">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pl-0 md:pl-10 max-w-3xl">
                   <FieldGroup label="Leverage">
                     <Input
                       type="number"
