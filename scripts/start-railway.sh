@@ -5,13 +5,19 @@ ENV="${RANGEGUARD_ENV:-testnet}"
 DB_FILE="/app/data/bot-${ENV}.db"
 
 # Ensure data + vault dirs exist and are writable (Railway volumes mount as root)
-mkdir -p /app/data /home/botuser/.rangeguard 2>/dev/null || true
+mkdir -p /app/data "$HOME/.rangeguard" 2>/dev/null || true
+
+# Track if this is a fresh deploy (before bootstrap creates the DB)
+FRESH_DEPLOY="false"
+if [ ! -f "$DB_FILE" ]; then
+  FRESH_DEPLOY="true"
+fi
 
 # Bootstrap vault from WALLET_KEYS env var
-# Always re-bootstrap if DB doesn't exist (fresh deploy) or vault is missing
+# Re-bootstrap on fresh deploy or if vault is missing
 if [ -n "$WALLET_KEYS" ]; then
   VAULT_FILE="${VAULT_PATH:-$HOME/.rangeguard/vault-${ENV}.enc}"
-  if [ ! -f "$VAULT_FILE" ] || [ ! -f "$DB_FILE" ]; then
+  if [ ! -f "$VAULT_FILE" ] || [ "$FRESH_DEPLOY" = "true" ]; then
     echo "WALLET_KEYS detected — bootstrapping vault..."
     rm -f "$VAULT_FILE" 2>/dev/null || true
     node --no-warnings --import tsx scripts/bootstrap-vault.ts
@@ -20,8 +26,8 @@ if [ -n "$WALLET_KEYS" ]; then
   fi
 fi
 
-# First run: create DB with migrations + optional seed
-if [ ! -f "$DB_FILE" ]; then
+# First run: seed DB (bootstrap-vault may have already created the file, so use FRESH_DEPLOY flag)
+if [ "$FRESH_DEPLOY" = "true" ]; then
   if [ "$DEMO_SEED" = "true" ]; then
     echo "First run + DEMO_SEED=true — seeding demo data..."
     node --no-warnings --import tsx scripts/demo-seed.ts
