@@ -28,6 +28,7 @@ export interface PoolConfig {
   hedgeRatio: number; // 0.1–2.0, multiplier on hedge size (default 1.0)
   hedgeCooldownSeconds: number; // per-pool cooldown after range return (default 300)
   debounceCount: number; // per-pool debounce ticks for range exit confirmation (default 3)
+  rangeBufferPercent: number; // hysteresis buffer: 0.5 = need 0.5% past boundary to trigger (default 0.5)
   protectionActive: boolean;
   status: PoolStatus;
   currentPrice?: string;
@@ -69,6 +70,7 @@ export interface CreatePoolConfig {
   hedgeRatio?: number; // default 1.0
   hedgeCooldownSeconds?: number; // default 300
   debounceCount?: number; // default 3
+  rangeBufferPercent?: number; // default 0.5
   protectionActive: boolean;
 
   // LP position reading

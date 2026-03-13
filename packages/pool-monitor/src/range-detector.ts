@@ -14,6 +14,7 @@ interface PoolState {
   rangeLower: number;
   rangeUpper: number;
   debounceCount: number; // per-pool debounce threshold
+  rangeBufferPercent: number; // hysteresis buffer (e.g. 0.5 = 0.5%)
   cooldownMs: number; // per-pool cooldown duration
   lastTransitionAt: number;
   cooldownUntil: number;
@@ -57,6 +58,7 @@ export class RangeDetector {
       rangeLower: config.rangeLower,
       rangeUpper: config.rangeUpper,
       debounceCount: config.debounceCount ?? this.debounceCount,
+      rangeBufferPercent: config.rangeBufferPercent ?? 0,
       cooldownMs: poolCooldownMs,
       lastTransitionAt: 0,
       cooldownUntil: 0,
@@ -80,6 +82,7 @@ export class RangeDetector {
     direction: ProtectionDirection,
     cooldownSeconds?: number,
     debounceCount?: number,
+    rangeBufferPercent?: number,
   ): void {
     const state = this.states.get(configId);
     if (state) {
@@ -96,6 +99,9 @@ export class RangeDetector {
       if (debounceCount !== undefined) {
         state.debounceCount = debounceCount;
       }
+      if (rangeBufferPercent !== undefined) {
+        state.rangeBufferPercent = rangeBufferPercent;
+      }
     }
   }
 
@@ -109,14 +115,32 @@ export class RangeDetector {
 
     const now = Date.now();
 
-    // Determine where the price is relative to the range
+    // Determine where the price is relative to the range (with hysteresis buffer)
+    // When in-range: need price to go FURTHER out to trigger exit
+    // When out-of-range: need price to come FURTHER in to trigger return
+    const buf = state.rangeBufferPercent / 100;
     let observedState: RangeState;
-    if (currentPrice < state.rangeLower) {
-      observedState = 'out-of-range-below';
-    } else if (currentPrice > state.rangeUpper) {
-      observedState = 'out-of-range-above';
+
+    if (state.currentState === 'in-range') {
+      // Exit requires price past boundary + buffer
+      if (currentPrice < state.rangeLower * (1 - buf)) {
+        observedState = 'out-of-range-below';
+      } else if (currentPrice > state.rangeUpper * (1 + buf)) {
+        observedState = 'out-of-range-above';
+      } else {
+        observedState = 'in-range';
+      }
     } else {
-      observedState = 'in-range';
+      // Return requires price inside boundary + buffer
+      if (currentPrice > state.rangeLower * (1 + buf) && currentPrice < state.rangeUpper * (1 - buf)) {
+        observedState = 'in-range';
+      } else if (currentPrice < state.rangeLower) {
+        observedState = 'out-of-range-below';
+      } else if (currentPrice > state.rangeUpper) {
+        observedState = 'out-of-range-above';
+      } else {
+        observedState = state.currentState; // in buffer zone — stay in current state
+      }
     }
 
     // If same as current confirmed state, reset pending

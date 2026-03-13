@@ -489,7 +489,7 @@ async function main() {
 
     // Add newly activated pools
     for (const pool of activePools) {
-      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}:${pool.hedgeRatio}:${pool.hedgeCooldownSeconds}:${pool.debounceCount}:${pool.tradingEnabled}:${pool.tradingEntryZonePercent}:${pool.tradingCooldownSeconds}:${pool.leverage}:${pool.tradingLeverage}`;
+      const rangeKey = `${pool.rangeLower}:${pool.rangeUpper}:${pool.protectionDirection}:${pool.hedgeRatio}:${pool.hedgeCooldownSeconds}:${pool.debounceCount}:${pool.rangeBufferPercent}:${pool.tradingEnabled}:${pool.tradingEntryZonePercent}:${pool.tradingCooldownSeconds}:${pool.leverage}:${pool.tradingLeverage}`;
 
       if (!watchedPoolIds.has(pool.id)) {
         rangeDetector.register(pool);
@@ -514,6 +514,7 @@ async function main() {
           pool.protectionDirection,
           pool.hedgeCooldownSeconds,
           pool.debounceCount,
+          pool.rangeBufferPercent,
         );
         rangeTradingEngine.updateConfig(pool);
         poolRangeCache.set(pool.id, rangeKey);

@@ -23,6 +23,7 @@ interface PoolConfigRow {
   hedge_ratio: number;
   hedge_cooldown_seconds: number;
   debounce_count: number;
+  range_buffer_percent: number;
   protection_active: number;
   status: string;
   current_price: string | null;
@@ -64,6 +65,7 @@ function rowToPoolConfig(row: PoolConfigRow): PoolConfig {
     hedgeRatio: row.hedge_ratio,
     hedgeCooldownSeconds: row.hedge_cooldown_seconds,
     debounceCount: row.debounce_count,
+    rangeBufferPercent: row.range_buffer_percent ?? 0.5,
     protectionActive: row.protection_active === 1,
     status: row.status as PoolStatus,
     currentPrice: row.current_price ?? undefined,
@@ -99,7 +101,7 @@ export class PoolsRepository {
         token0_symbol, token1_symbol, fee_tier, range_lower, range_upper,
         pool_amount, hedge_asset, leverage, protection_direction,
         protection_wallet_id, profit_wallet_enabled, hedge_ratio,
-        hedge_cooldown_seconds, debounce_count, protection_active,
+        hedge_cooldown_seconds, debounce_count, range_buffer_percent, protection_active,
         lp_token_id, pool_amount_source,
         status, created_at, updated_at
       ) VALUES (
@@ -107,7 +109,7 @@ export class PoolsRepository {
         @token0Symbol, @token1Symbol, @feeTier, @rangeLower, @rangeUpper,
         @poolAmount, @hedgeAsset, @leverage, @protectionDirection,
         @protectionWalletId, @profitWalletEnabled, @hedgeRatio,
-        @hedgeCooldownSeconds, @debounceCount, @protectionActive,
+        @hedgeCooldownSeconds, @debounceCount, @rangeBufferPercent, @protectionActive,
         @lpTokenId, @poolAmountSource,
         @status, @createdAt, @updatedAt
       )
@@ -134,6 +136,7 @@ export class PoolsRepository {
       hedgeRatio: data.hedgeRatio ?? 1.0,
       hedgeCooldownSeconds: data.hedgeCooldownSeconds ?? 300,
       debounceCount: data.debounceCount ?? 3,
+      rangeBufferPercent: data.rangeBufferPercent ?? 0.5,
       protectionActive: data.protectionActive ? 1 : 0,
       lpTokenId: data.lpTokenId ?? null,
       poolAmountSource: data.poolAmountSource ?? 'manual',
@@ -249,6 +252,10 @@ export class PoolsRepository {
     if (data.debounceCount !== undefined) {
       fields.push('debounce_count = @debounceCount');
       values.debounceCount = data.debounceCount;
+    }
+    if (data.rangeBufferPercent !== undefined) {
+      fields.push('range_buffer_percent = @rangeBufferPercent');
+      values.rangeBufferPercent = data.rangeBufferPercent;
     }
     if (data.protectionActive !== undefined) {
       fields.push('protection_active = @protectionActive');

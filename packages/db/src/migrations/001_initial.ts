@@ -129,6 +129,7 @@ export function runMigrations(db: Database.Database): void {
     `ALTER TABLE pool_configs ADD COLUMN hedge_ratio REAL NOT NULL DEFAULT 1.0`,
     `ALTER TABLE pool_configs ADD COLUMN hedge_cooldown_seconds INTEGER NOT NULL DEFAULT 300`,
     `ALTER TABLE pool_configs ADD COLUMN debounce_count INTEGER NOT NULL DEFAULT 3`,
+    `ALTER TABLE pool_configs ADD COLUMN range_buffer_percent REAL NOT NULL DEFAULT 0.5`,
   ];
 
   for (const sql of hedgeColumns) {

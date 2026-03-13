@@ -71,6 +71,7 @@ export default function EditPoolPage() {
     hedgeRatio: '1.0',
     hedgeCooldownSeconds: '300',
     debounceCount: '3',
+    rangeBufferPercent: '0.5',
     protectionDirection: 'both' as 'below' | 'above' | 'both',
     protectionWalletId: '',
     profitWalletEnabled: true,
@@ -109,6 +110,7 @@ export default function EditPoolPage() {
           hedgeRatio: (pool.hedgeRatio ?? 1.0).toString(),
           hedgeCooldownSeconds: (pool.hedgeCooldownSeconds ?? 300).toString(),
           debounceCount: (pool.debounceCount ?? 3).toString(),
+          rangeBufferPercent: (pool.rangeBufferPercent ?? 0.5).toString(),
           protectionDirection: pool.protectionDirection,
           protectionWalletId: pool.protectionWalletId,
           profitWalletEnabled: pool.profitWalletEnabled,
@@ -153,6 +155,7 @@ export default function EditPoolPage() {
         hedgeRatio: parseFloat(form.hedgeRatio),
         hedgeCooldownSeconds: parseInt(form.hedgeCooldownSeconds),
         debounceCount: parseInt(form.debounceCount),
+        rangeBufferPercent: parseFloat(form.rangeBufferPercent),
         protectionDirection: form.protectionDirection,
         protectionWalletId: form.protectionWalletId,
         profitWalletEnabled: form.profitWalletEnabled,
@@ -503,6 +506,23 @@ export default function EditPoolPage() {
                   />
                   <p className="text-[11px] text-muted-foreground">
                     Espera post-cierre antes de nuevo hedge
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Buffer de Rango (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5"
+                    value={form.rangeBufferPercent}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, rangeBufferPercent: e.target.value }))
+                    }
+                    className="bg-muted border-border text-foreground"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Zona muerta en los bordes del rango para evitar whipsaw
                   </p>
                 </div>
               </div>

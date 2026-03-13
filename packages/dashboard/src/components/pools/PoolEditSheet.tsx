@@ -86,6 +86,7 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
     hedgeRatio: '1.0',
     hedgeCooldownSeconds: '300',
     debounceCount: '3',
+    rangeBufferPercent: '0.5',
     protectionDirection: 'both' as 'below' | 'above' | 'both',
     protectionWalletId: '',
     profitWalletEnabled: true,
@@ -130,6 +131,7 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
           hedgeRatio: (pool.hedgeRatio ?? 1.0).toString(),
           hedgeCooldownSeconds: (pool.hedgeCooldownSeconds ?? 300).toString(),
           debounceCount: (pool.debounceCount ?? 3).toString(),
+          rangeBufferPercent: (pool.rangeBufferPercent ?? 0.5).toString(),
           protectionDirection: pool.protectionDirection,
           protectionWalletId: pool.protectionWalletId,
           profitWalletEnabled: pool.profitWalletEnabled,
@@ -177,6 +179,7 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
         hedgeRatio: parseFloat(form.hedgeRatio),
         hedgeCooldownSeconds: parseInt(form.hedgeCooldownSeconds),
         debounceCount: parseInt(form.debounceCount),
+        rangeBufferPercent: parseFloat(form.rangeBufferPercent),
         protectionDirection: form.protectionDirection,
         protectionWalletId: form.protectionWalletId,
         profitWalletEnabled: form.profitWalletEnabled,
@@ -581,6 +584,21 @@ export function PoolEditSheet({ poolId, open, onOpenChange }: PoolEditSheetProps
                     className="bg-muted border-border text-foreground"
                   />
                   <p className="text-[10px] text-muted-foreground">segundos</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Buffer (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="5"
+                    value={form.rangeBufferPercent}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, rangeBufferPercent: e.target.value }))
+                    }
+                    className="bg-muted border-border text-foreground"
+                  />
+                  <p className="text-[10px] text-muted-foreground">zona muerta</p>
                 </div>
               </div>
             </section>

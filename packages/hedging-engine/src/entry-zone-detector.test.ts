@@ -23,6 +23,7 @@ function makeConfig(overrides: Partial<PoolConfig> = {}): PoolConfig {
     hedgeRatio: 1.0,
     hedgeCooldownSeconds: 300,
     debounceCount: 3,
+    rangeBufferPercent: 0.5,
     protectionActive: true,
     status: 'in-range',
     createdAt: Date.now(),
