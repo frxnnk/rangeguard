@@ -1,6 +1,6 @@
 [build]
 dockerfilePath = "Dockerfile"
-target = "dashboard"
+target = "combined"
 
 [deploy]
 healthcheckPath = "/api/bot-status"
