@@ -22,8 +22,12 @@ interface ClientPair {
   wsReconnectAttempt: number;
 }
 
-/** Max reconnect backoff: 60s */
+/** Max reconnect backoff: 60s (first 10 attempts), then 5 min */
 const MAX_RECONNECT_DELAY_MS = 60_000;
+/** Slow retry delay after many consecutive failures */
+const SLOW_RECONNECT_DELAY_MS = 5 * 60_000;
+/** Switch to slow retry after this many consecutive failures */
+const SLOW_RETRY_THRESHOLD = 10;
 /** Initial reconnect delay: 1s */
 const BASE_RECONNECT_DELAY_MS = 1_000;
 
@@ -106,25 +110,37 @@ export class ChainClientManager {
     } catch (error) {
       pair.wsReconnectAttempt++;
       this.setWsStatus(pair, chainId, 'disconnected');
-      logger.warn(
-        { chainId, attempt: pair.wsReconnectAttempt, error },
-        'WebSocket reconnection failed',
-      );
+      // Reduce log noise: warn every attempt during fast phase, every 10th in slow phase
+      if (pair.wsReconnectAttempt < SLOW_RETRY_THRESHOLD || pair.wsReconnectAttempt % 10 === 0) {
+        logger.warn(
+          { chainId, attempt: pair.wsReconnectAttempt, error },
+          'WebSocket reconnection failed',
+        );
+      }
       this.scheduleReconnect(chainId, pair);
       return false;
     }
   }
 
-  /** Schedule an automatic reconnect with exponential backoff */
+  /** Schedule an automatic reconnect with exponential backoff (slows down after many failures) */
   private scheduleReconnect(chainId: number, pair: ClientPair): void {
     if (pair.wsReconnectTimer) return; // already scheduled
 
-    const delay = Math.min(
-      BASE_RECONNECT_DELAY_MS * Math.pow(2, pair.wsReconnectAttempt - 1),
-      MAX_RECONNECT_DELAY_MS,
-    );
+    const isSlow = pair.wsReconnectAttempt >= SLOW_RETRY_THRESHOLD;
+    const delay = isSlow
+      ? SLOW_RECONNECT_DELAY_MS
+      : Math.min(
+          BASE_RECONNECT_DELAY_MS * Math.pow(2, pair.wsReconnectAttempt - 1),
+          MAX_RECONNECT_DELAY_MS,
+        );
 
-    logger.info({ chainId, delayMs: delay }, 'Scheduling WS reconnect');
+    // Only log every attempt during fast phase, every 10th during slow phase
+    if (!isSlow || pair.wsReconnectAttempt % 10 === 0) {
+      logger.info(
+        { chainId, delayMs: delay, attempt: pair.wsReconnectAttempt },
+        isSlow ? 'WS still unavailable, retrying in slow mode' : 'Scheduling WS reconnect',
+      );
+    }
 
     pair.wsReconnectTimer = setTimeout(async () => {
       pair.wsReconnectTimer = undefined;
