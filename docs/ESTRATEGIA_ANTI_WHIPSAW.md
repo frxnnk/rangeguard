@@ -2,221 +2,227 @@
 
 ## 1. El Problema
 
-Cuando el precio de un par oscila cerca del borde del rango LP (liquidity pool), el bot detecta falsas salidas y reentradas al rango, ejecutando hedges innecesarios. Cada ciclo de apertura/cierre tiene un costo real:
+Cuando el precio de un par oscila cerca del borde del rango LP, el bot detecta falsas salidas y reentradas, ejecutando hedges innecesarios. Cada ciclo apertura/cierre cuesta:
 
-- **Slippage**: diferencia entre precio esperado y precio de ejecucion (IOC limit con 1% tolerancia)
-- **Fees**: 0.035% taker en Hyperliquid por cada operacion (apertura + cierre = 0.07% del nocional)
-- **Latencia**: ~2-3s entre deteccion y fill, durante los cuales el precio puede revertir
+- **Fees**: 0.035% taker en Hyperliquid por operacion (apertura + cierre = 0.07% del nocional)
+- **Slippage**: IOC limit con 1% tolerancia, en testnet puede ser peor por falta de liquidez
+- **Latencia**: ~2-3s entre deteccion y fill
 
-### Ejemplo real
+### Caso real (testnet, 13/03/2026)
 
-Un pool ETH/USDC con rango 1800-2200 durante un dia de volatilidad moderada:
+Pool ETH/USDC, rango $2,050-$2,100, precio oscilando en el borde superior:
 
-| # | Tipo | Precio | Resultado | Costo fees |
-|---|------|--------|-----------|------------|
-| 1 | Exit + Return | $1798 -> $1805 | False breakout | $0.35 |
-| 2 | Exit + Return | $1799 -> $1810 | False breakout | $0.35 |
-| 3 | Exit + Return | $1797 -> $1803 | False breakout | $0.35 |
-| 4 | Exit + Return | $1795 -> $1808 | False breakout | $0.35 |
-| 5 | Exit + Return | $1796 -> $1815 | False breakout | $0.35 |
-| 6 | Exit + Return | $1798 -> $1804 | False breakout | $0.35 |
-| 7 | Exit + Return | $1794 -> $1812 | False breakout | $0.35 |
-| 8 | Exit + Return | $1799 -> $1806 | False breakout | $0.35 |
-| 9 | Exit + Return | $1793 -> $1820 | False breakout | $0.35 |
-| 10 | Exit + Return | $1797 -> $1809 | False breakout | $0.35 |
-| 11 | Exit (real) | $1785 -> sostenido | Hedge real | $0.35 |
+| # | Entrada | Salida | PnL | Duracion | Tipo |
+|---|---------|--------|-----|----------|------|
+| 1 | $2,114.60 | $2,098.86 | -$3.72 | 2h 07m | False breakout |
+| 2 | $2,099.20 | $2,099.72 | +$0.12 | 1m | OK |
+| 3 | $2,099.92 | $2,099.82 | -$0.02 | 3m | False breakout |
+| 4 | $2,101.30 | $2,099.85 | -$0.35 | 2m | False breakout |
+| 5 | $2,101.25 | $2,099.54 | -$0.41 | 6m | False breakout |
+| 6 | $2,101.17 | $2,099.74 | -$0.34 | 2m | False breakout |
+| 7 | $2,100.65 | $2,099.60 | -$0.25 | 2m | False breakout |
+| 8 | $2,100.41 | $2,099.61 | -$0.19 | 18m | False breakout |
+| 9 | $2,102.00 | $2,099.64 | -$0.56 | 3m | False breakout |
+| 10 | $2,102.84 | $2,099.64 | -$0.76 | 15m | False breakout |
+| 11 | $2,101.60 | $2,098.12 | -$0.83 | 8h 27m | False breakout |
 
-**Total**: 11 trades, 10 false breakouts, perdida por PnL: -$7.31, fees: $3.85. La mayoria de las perdidas fueron evitables.
+**Total: -$7.31 PnL + $3.85 fees = -$11.16**. Solo 1 de 11 trades fue genuino (y aun asi fue false breakout largo).
+
+**Observacion clave**: Los trades 2-11 entraron entre $2,099-$2,103 — apenas 0-0.14% pasado el borde de $2,100. El trade 1 entro a $2,114.60 (0.70% pasado el borde). Hay una separacion clara entre ruido (<0.15%) y señales reales (>0.5%).
 
 ## 2. Parametros Anti-Whipsaw
 
-RangeGuard implementa tres mecanismos complementarios, configurables por pool desde el dashboard.
+Tres mecanismos complementarios, configurables por pool desde el dashboard.
 
-### 2.1 `rangeBufferPercent` - Buffer de Rango (Histeresis)
+### 2.1 `rangeBufferPercent` — Buffer de Rango (Histeresis)
 
-**Que hace**: Crea una zona muerta alrededor de los bordes del rango para evitar que oscilaciones minimas disparen transiciones.
+**Que hace**: Zona muerta alrededor de los bordes del rango. La defensa principal.
 
-**Como funciona**: Aplica un buffer asimetrico segun el estado actual:
+**Como funciona**: Buffer asimetrico segun el estado actual:
 
-- **Para salir del rango** (estado actual: in-range): el precio debe superar el borde en un X% adicional.
-  - Borde inferior: `precio < rangeLower * (1 - buffer)`
-  - Borde superior: `precio > rangeUpper * (1 + buffer)`
-- **Para volver al rango** (estado actual: out-of-range): el precio debe entrar un X% dentro del borde.
-  - Retorno: `precio > rangeLower * (1 + buffer) AND precio < rangeUpper * (1 - buffer)`
-- **Zona muerta**: si el precio esta entre el borde y el buffer, mantiene el estado actual sin cambios.
+- **Estando in-range** (para salir): precio debe superar borde + buffer%
+  - Salir por arriba: `precio > rangeUpper * (1 + buffer/100)`
+  - Salir por abajo: `precio < rangeLower * (1 - buffer/100)`
+- **Estando out-of-range** (para volver): precio debe entrar borde + buffer%
+  - Retorno: `precio > rangeLower * (1 + buffer/100) AND precio < rangeUpper * (1 - buffer/100)`
+- **Zona muerta**: entre borde y buffer, mantiene estado actual
 
-**Ejemplo** con rango 1800-2200 y buffer 0.5%:
-- Para salir por abajo: precio debe bajar a `1800 * 0.995 = $1791`
-- Para volver: precio debe subir a `1800 * 1.005 = $1809`
-- Zona muerta: $1791 - $1809 (rango de $18 donde no ocurre ninguna transicion)
+**Ejemplo con datos reales**: Rango $2,043-$2,170, buffer 0.3%:
+- Salir por arriba: precio debe superar `$2,170 * 1.003 = $2,176.51`
+- Volver al rango: precio debe bajar a `$2,170 * 0.997 = $2,163.49`
+- Zona muerta superior: $2,163 - $2,177 ($14 donde no hay transicion)
 
-| Valor | Efecto |
-|-------|--------|
-| 0% | Sin buffer, detecta cada tick (maximo whipsaw) |
-| 0.2% | Buffer minimo, reduce ruido leve |
-| **0.5%** (default) | Buen balance para la mayoria de pools |
-| 1.0% | Agresivo, puede perder breakouts reales rapidos |
+**Tradeoff importante** (planteado por Tomas):
+> "Comprás mas caro cuando sale para arriba del rango"
 
-### 2.2 `debounceCount` - Debounce Ponderado
+Es cierto: con buffer 0.3% y 0.24 ETH, el hedge abre ~$6.30 mas caro, costando ~$1.51 extra por trade. PERO en los datos reales los 10 false breakouts nunca llegaron a $2,106 — el buffer los elimina TODOS. El ahorro de 10 trades evitados (~$7.09) supera ampliamente el costo extra del unico trade que pasa.
 
-**Que hace**: Requiere multiples confirmaciones consecutivas antes de ejecutar una transicion de estado. Las confirmaciones se acumulan con peso adaptivo.
+| Buffer | Trigger (rango $2,100) | Trades filtrados | Costo extra/trade | Ahorro total |
+|--------|----------------------|------------------|-------------------|--------------|
+| 0% | $2,100.00 | 0/10 | $0 | $0 |
+| 0.15% | $2,103.15 | 8/10 | $0.75 | ~$5.85 |
+| **0.3%** | **$2,106.30** | **10/10** | **$1.51** | **~$7.09** |
+| 0.5% | $2,110.50 | 10/10 | $2.52 | ~$7.09 |
 
-**Como funciona**: Cada price update que observa un estado diferente al actual acumula `signalStrength`. Cuando `signalStrength >= debounceCount`, se confirma la transicion. Si un update contradice la tendencia, el contador se reinicia.
+**Recomendado: 0.3%** — filtra todo el ruido con el menor costo extra por trade.
 
-Con WebSocket, los price updates llegan cada 2-10 segundos. Con un debounce de 3, una transicion toma minimo 6-30 segundos. Con debounce de 8, toma 16-80 segundos.
+### 2.2 `debounceCount` — Debounce Ponderado
 
-**Peso adaptivo** (Adaptive Signal Weight): Las senales se ponderan segun la distancia del precio al borde del rango, como proporcion del ancho del rango:
+**Que hace**: Requiere multiples confirmaciones ponderadas antes de confirmar una transicion.
 
-| Desviacion | Peso | Ticks para debounce=3 | Interpretacion |
-|-----------|------|------------------------|----------------|
-| > 2% del ancho del rango | 1.5 | ~2 ticks | Senal fuerte: el precio se alejo significativamente |
-| 0.5% - 2% | 1.0 | 3 ticks | Senal normal: movimiento moderado |
-| < 0.5% | 0.75 | ~4 ticks | Senal debil: precio muy cerca del borde, mas confirmacion |
+**Como funciona**: Cada price update acumula `signalStrength += peso`. Cuando `signalStrength >= debounceCount`, se confirma. Si un update contradice, se reinicia.
 
-**Ejemplo**: rango 1800-2200 (ancho = $400), precio en $1790 (10 por debajo = 2.5% del ancho):
-- Peso = 1.5 (senal fuerte)
-- Con debounce=3: se confirma en ~2 updates
+**Peso adaptivo** (automatico, no configurable):
 
-Mismo rango, precio en $1798 ($2 por debajo = 0.5% del ancho):
-- Peso = 0.75 (senal debil)
-- Con debounce=3: se confirma en ~4 updates
+| Desviacion del borde | Peso | Con debounce=5 | Tiempo aprox (WS) |
+|---------------------|------|----------------|-------------------|
+| > 2% del ancho rango | 1.5 | ~4 ticks | 8-20s |
+| 0.5-2% | 1.0 | 5 ticks | 10-25s |
+| < 0.5% | 0.75 | ~7 ticks | 14-35s |
 
-| Valor | Latencia tipica (WS) | Uso |
-|-------|----------------------|-----|
-| 1-2 | 2-20s | Respuesta muy rapida, alto riesgo de false breakouts |
-| **3** (default) | 6-30s | Balance conservador |
-| 5-8 (recomendado) | 10-80s | Buena filtracion de ruido |
-| 10+ | 20-100s | Muy conservador, puede perder breakouts reales |
+Con WS, updates llegan cada 2-10 segundos. El debounce filtra ruido de segundos, NO de minutos. Es la capa terciaria.
 
-### 2.3 `hedgeCooldownSeconds` - Cooldown Post-Cierre
+**Recomendado: 5** — buen balance entre respuesta rapida a breakouts reales y filtrado de ruido.
 
-**Que hace**: Despues de que el precio vuelve al rango y se cierra un hedge, impone un periodo de espera antes de permitir un nuevo hedge para ese pool.
+### 2.3 `hedgeCooldownSeconds` — Cooldown Post-Cierre
 
-**Como funciona**: Cuando ocurre un range return, se registra `cooldownUntil = now + cooldownMs`. Cualquier range exit detectado antes de ese timestamp se ignora (el estado se revierte internamente).
+**Que hace**: Espera obligatoria despues de cerrar un hedge antes de permitir uno nuevo.
 
-Esto previene el escenario mas costoso: el precio sale, vuelve, sale de nuevo en cuestion de minutos, generando 2-3 ciclos de hedge en rapida sucesion.
+**Como funciona**: Al cerrar hedge, se registra `cooldownUntil = now + cooldownMs`. Cualquier exit durante cooldown se ignora.
 
-| Valor | Uso |
-|-------|-----|
-| 60s (1min) | Minimo, solo previene rebotes inmediatos |
-| **300s** (5min, default) | Balance basico |
-| 600s (10min, recomendado) | Buena proteccion contra series rapidas |
-| 900s (15min) | Conservador, ideal para pools con fees altos |
-| 1800s (30min) | Muy conservador, solo para escenarios de alta volatilidad |
+**Dato real**: Los trades 2-10 ocurrieron en ~3 horas (cluster de whipsaw). Un cooldown de 10 min hubiera filtrado 5-7 de ellos.
 
-### 2.4 Adaptive Signal Weight (automatico)
+| Cooldown | Trades cluster filtrados | Uso |
+|----------|--------------------------|-----|
+| 300s (5min) | ~3-4 | Default, basico |
+| **600s (10min)** | **~5-7** | **Recomendado** |
+| 900s (15min) | ~7-8 | Conservador |
+| 1800s (30min) | 9 (todo el cluster) | Muy conservador |
 
-Este mecanismo ya esta implementado dentro del debounce (seccion 2.2) y **no es configurable por separado**. Su funcion es que las senales debiles (precio apenas cruzando el borde) necesiten mas confirmaciones que las senales fuertes (precio claramente fuera del rango).
+**Nota**: El cooldown solo aplica a exits (apertura). Los returns (cierre) siempre se ejecutan inmediatamente.
 
-La logica calcula la desviacion del precio respecto al borde mas cercano, como fraccion del ancho total del rango, y asigna un peso de 0.75, 1.0 o 1.5 a cada tick. Esto hace que el debounce sea efectivamente adaptivo sin necesidad de configuracion manual.
-
-## 3. Como Interactuan
-
-Los tres mecanismos forman un pipeline secuencial. Cada precio recibido pasa por todas las etapas:
+## 3. Pipeline de Decision
 
 ```
 Price Update
     |
     v
-[1. Buffer Check] --> Precio en zona muerta? --> IGNORAR (mantener estado actual)
+[1. Buffer] --> Precio en zona muerta? --> IGNORAR
     |
-    | (precio fuera de zona muerta)
     v
-[2. Signal Weight] --> Calcular peso segun distancia al borde (0.75 / 1.0 / 1.5)
+[2. Signal Weight] --> Calcular peso: 0.75 / 1.0 / 1.5
     |
     v
 [3. Debounce] --> signalStrength += peso
-    |             signalStrength < debounceCount? --> ESPERAR (acumular mas ticks)
+    |              < debounceCount? --> ESPERAR
     |
-    | (signalStrength >= debounceCount)
     v
-[4. Cooldown Check] --> Es un range EXIT y estamos en cooldown? --> IGNORAR (revertir estado)
+[4. Cooldown] --> Exit durante cooldown? --> IGNORAR
     |
-    | (no hay cooldown activo, o es un range RETURN)
     v
-[5. Ejecutar Transicion]
-    |
+[5. EJECUTAR]
     +--> Range Exit: abrir hedge
     +--> Range Return: cerrar hedge + activar cooldown
 ```
 
-**Nota**: el cooldown solo aplica a range exits (apertura de hedge). Los range returns (cierre de hedge) siempre se ejecutan inmediatamente al pasar el debounce, ya que retrasar el cierre incrementaria la exposicion.
+Cada capa filtra un tipo distinto de ruido:
+- **Buffer**: oscilaciones espaciales (precio cerca del borde)
+- **Debounce**: oscilaciones temporales (ticks rapidos)
+- **Cooldown**: series repetitivas (whipsaw post-cierre)
 
-## 4. Configuracion Recomendada
+## 4. Perfiles de Configuracion
 
 | Parametro | Conservador | Balanceado | Agresivo |
 |-----------|-------------|------------|----------|
-| `rangeBufferPercent` | 0.8% | 0.5% | 0.2% |
-| `debounceCount` | 8 | 5 | 3 |
-| `hedgeCooldownSeconds` | 900s (15min) | 600s (10min) | 300s (5min) |
-| **Latencia apertura** | ~30-80s | ~15-50s | ~6-30s |
-| **False breakouts filtrados** | ~90-95% | ~75-85% | ~50-60% |
-| **Riesgo de perder exit real** | Medio | Bajo | Muy bajo |
+| `rangeBufferPercent` | 0.8% | **0.3%** | 0.1% |
+| `debounceCount` | 8 | **5** | 3 |
+| `hedgeCooldownSeconds` | 900s | **600s** | 300s |
+| Latencia apertura | ~30-80s | **~15-50s** | ~6-30s |
+| False breakouts filtrados | ~95% | **~90%** | ~60% |
+| Riesgo de perder exit real | Medio | Bajo | Muy bajo |
 
 **Cuando usar cada perfil**:
 
-- **Conservador**: Pools con rangos estrechos, pares de alta volatilidad (ETH/USDC rango < 10%), o cuando el costo por trade es alto relativo al pool.
-- **Balanceado**: La mayoria de pools. Buen punto de partida.
-- **Agresivo**: Pools grandes donde el costo por trade es despreciable, o rangos amplios donde los false breakouts son raros.
+- **Conservador**: Rangos estrechos, alta volatilidad, pools chicos
+- **Balanceado**: La mayoria de pools. Punto de partida recomendado
+- **Agresivo**: Pools grandes, rangos amplios, baja volatilidad
 
-## 5. Ejemplo con Datos Reales
+## 5. Analisis con Datos Reales
 
-Tomando los 11 trades del ejemplo de la seccion 1, veamos como los filtraria el perfil **Balanceado** (buffer 0.5%, debounce 5, cooldown 600s):
+Con el perfil **Balanceado** (buffer 0.3%, debounce 5, cooldown 600s) aplicado a los 11 trades reales:
 
-| # | Precio exit | Pasa buffer? (< $1791) | Pasa debounce? | En cooldown? | Resultado |
-|---|-------------|------------------------|----------------|--------------|-----------|
-| 1 | $1798 | NO ($1798 > $1791) | - | - | FILTRADO por buffer |
-| 2 | $1799 | NO | - | - | FILTRADO por buffer |
-| 3 | $1797 | NO | - | - | FILTRADO por buffer |
-| 4 | $1795 | NO | - | - | FILTRADO por buffer |
-| 5 | $1796 | NO | - | - | FILTRADO por buffer |
-| 6 | $1798 | NO | - | - | FILTRADO por buffer |
-| 7 | $1794 | NO | - | - | FILTRADO por buffer |
-| 8 | $1799 | NO | - | - | FILTRADO por buffer |
-| 9 | $1793 | NO | - | - | FILTRADO por buffer |
-| 10 | $1797 | NO | - | - | FILTRADO por buffer |
-| 11 | $1785 | SI ($1785 < $1791) | SI (sostenido) | NO | EJECUTADO |
+| # | Entrada | Pasa buffer? (> $2,106.30) | Resultado |
+|---|---------|---------------------------|-----------|
+| 1 | $2,114.60 | SI | EJECUTADO (breakout real, aunque luego revirtio) |
+| 2 | $2,099.20 | NO | FILTRADO |
+| 3 | $2,099.92 | NO | FILTRADO |
+| 4 | $2,101.30 | NO | FILTRADO |
+| 5 | $2,101.25 | NO | FILTRADO |
+| 6 | $2,101.17 | NO | FILTRADO |
+| 7 | $2,100.65 | NO | FILTRADO |
+| 8 | $2,100.41 | NO | FILTRADO |
+| 9 | $2,102.00 | NO | FILTRADO |
+| 10 | $2,102.84 | NO | FILTRADO |
+| 11 | $2,101.60 | NO | FILTRADO |
 
-**Resultado**: 1 trade en vez de 11. Ahorro: ~$10.81 (PnL false breakouts + fees evitados). Solo se ejecuto el hedge real cuando el precio cayo definitivamente a $1785.
+**Resultado: 1 trade en vez de 11**
 
-En este caso, el buffer solo fue suficiente para filtrar todos los false breakouts porque ninguno supero el $1791. En escenarios donde los false breakouts son mas profundos, el debounce y el cooldown actuan como capas adicionales de proteccion.
+| Metrica | Sin proteccion | Con perfil balanceado |
+|---------|---------------|----------------------|
+| Trades | 11 | 1 |
+| PnL | -$7.31 | -$3.72 |
+| Fees | -$3.85 | -$0.35 |
+| **Total** | **-$11.16** | **-$4.07** |
+| **Ahorro** | — | **$7.09 (63.5%)** |
 
-## 6. Como Ajustar
+La perdida residual (-$4.07) es del trade 1, un breakout genuino que revirtio. Esto solo se puede mitigar con un stop-loss mas ajustado en el hedge, no con anti-whipsaw.
 
-### Hay muchos false breakouts (demasiados trades)
+## 6. Guia de Ajuste
 
-1. **Subir `rangeBufferPercent`** a 0.8-1.0%. Esta es la primera linea de defensa y la mas efectiva.
-2. **Subir `hedgeCooldownSeconds`** a 600-900s. Evita series rapidas post-cierre.
-3. **Subir `debounceCount`** a 6-8. Requiere mas confirmaciones.
+### Demasiados false breakouts (> 3 trades/dia)
+1. Subir `rangeBufferPercent` a 0.5-0.8%
+2. Subir `hedgeCooldownSeconds` a 900s
+3. Subir `debounceCount` a 6-8
 
-### El hedge tarda demasiado en abrirse
+### Hedge tarda en abrirse
+1. Bajar `debounceCount` a 3
+2. No bajar `rangeBufferPercent` debajo de 0.2%
+3. Cooldown no afecta al primer hedge, solo a consecutivos
 
-1. **Bajar `debounceCount`** a 3. Menos ticks de confirmacion.
-2. No bajar `rangeBufferPercent` por debajo de 0.2% — genera demasiado ruido.
-3. El cooldown no afecta al primer hedge del dia, solo a hedges consecutivos.
+### Volatilidad alta (noticias, macro)
+1. Subir `rangeBufferPercent` a 1.0% temporalmente
+2. Subir cooldown a 900-1800s
+3. Considerar pausar pool desde dashboard
 
-### La volatilidad esta alta (ej. noticias macro, merge)
+### Volatilidad baja (mercado lateral)
+1. Bajar `rangeBufferPercent` a 0.2%
+2. Bajar `debounceCount` a 3-4
+3. Precio rara vez sale del rango, parametros importan menos
 
-1. **Subir `rangeBufferPercent`** temporalmente a 1.0%.
-2. **Subir `hedgeCooldownSeconds`** a 900-1800s.
-3. Considerar pausar el pool desde el dashboard si la volatilidad es extrema.
+### Regla de oro
 
-### La volatilidad esta baja (mercado lateral)
+> **Costo false breakout** = fijo (~$0.35 fees + slippage por ciclo)
+> **Costo breakout perdido** = variable (depende de cuanto se mueve el precio sin hedge)
 
-1. **Bajar `rangeBufferPercent`** a 0.2-0.3%.
-2. **Bajar `debounceCount`** a 3-4.
-3. En mercados muy laterales, el precio rara vez sale del rango, asi que los parametros importan menos.
+Ajustar hacia prevencion cuando:
+- Pool chico (fees pesan mas)
+- Rango estrecho (mas whipsaw)
+- Frecuencia alta (> 3 trades/dia)
 
-### Regla general
+Ajustar hacia velocidad cuando:
+- Pool grande (fees despreciables)
+- Rango amplio (breakouts infrecuentes pero grandes)
+- Historico con pocos false breakouts
 
-El costo de un false breakout es fijo (~0.07% del nocional en fees + slippage). El costo de perder un breakout real es variable (depende de cuanto se mueva el precio antes de que el hedge se abra). Ajustar hacia la prevencion de false breakouts cuando:
+## 7. Configuracion Actual (Testnet)
 
-- El pool es pequeno (fees fijos pesan mas)
-- El rango es estrecho (mas probabilidad de whipsaw)
-- La frecuencia de trades es alta (> 3/dia)
+```
+Pool:            ETH/USDC Arbitrum 0.05%
+Rango:           $2,043 - $2,170 (±3%)
+Buffer:          0.3%
+Debounce:        5 ticks
+Cooldown:        600s (10 min)
+Perfil:          Balanceado
+```
 
-Ajustar hacia la velocidad de reaccion cuando:
-
-- El pool es grande (fees son despreciables)
-- El rango es amplio (breakouts son infrecuentes pero significativos)
-- El historico muestra pocos false breakouts
+Ultima actualizacion: 2026-03-13
