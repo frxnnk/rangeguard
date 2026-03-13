@@ -26,7 +26,7 @@ if [ -n "$WALLET_KEYS" ]; then
   fi
 fi
 
-# First run: seed DB (bootstrap-vault may have already created the file, so use FRESH_DEPLOY flag)
+# Seed DB if needed (scripts are idempotent — safe to run on every deploy)
 if [ "$FRESH_DEPLOY" = "true" ]; then
   if [ "$DEMO_SEED" = "true" ]; then
     echo "First run + DEMO_SEED=true — seeding demo data..."
@@ -35,7 +35,7 @@ if [ "$FRESH_DEPLOY" = "true" ]; then
     echo "First run + TESTNET_SEED=true — creating pool config..."
     node --no-warnings --import tsx scripts/testnet-seed-railway.ts
   else
-    echo "First run ($ENV) — running migrations (empty DB, configure via dashboard)..."
+    echo "First run ($ENV) — running migrations only..."
     node --no-warnings --import tsx -e "
       import { getDatabase, closeDatabase } from './packages/db/src/connection.js';
       import { runMigrations } from './packages/db/src/migrations/001_initial.js';
@@ -44,6 +44,10 @@ if [ "$FRESH_DEPLOY" = "true" ]; then
       closeDatabase();
     "
   fi
+elif [ "$TESTNET_SEED" = "true" ]; then
+  # Existing DB but TESTNET_SEED=true — ensure pool exists (idempotent)
+  echo "Ensuring pool config exists..."
+  node --no-warnings --import tsx scripts/testnet-seed-railway.ts
 fi
 
 # Start bot in background (no vault = no trading, just heartbeat)
