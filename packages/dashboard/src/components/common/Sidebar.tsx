@@ -16,6 +16,7 @@ import {
   Menu,
   LogOut,
   FlaskConical,
+  BookOpen,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -34,6 +35,10 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Simulación',
     items: [{ href: '/backtest', label: 'Backtest', icon: FlaskConical }],
+  },
+  {
+    title: 'Conocimiento',
+    items: [{ href: '/docs', label: 'Documentación', icon: BookOpen }],
   },
   {
     title: 'Operaciones',
