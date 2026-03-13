@@ -210,8 +210,17 @@ export class HyperliquidClient {
     } catch (error) {
       const latencyMs = Date.now() - start;
       const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error({ walletId, asset, error: errMsg }, 'Order failed');
-      return { success: false, error: errMsg, latencyMs };
+      const isNoLiquidity = errMsg.includes('could not immediately match against any resting orders');
+      if (isNoLiquidity) {
+        logger.warn({ walletId, asset, latencyMs }, 'No liquidity on exchange — order book empty (common on testnet)');
+      } else {
+        logger.error({ walletId, asset, error: errMsg }, 'Order failed');
+      }
+      return {
+        success: false,
+        error: isNoLiquidity ? `No liquidity for ${asset} — order book empty (testnet?)` : errMsg,
+        latencyMs,
+      };
     }
   }
 
@@ -294,8 +303,17 @@ export class HyperliquidClient {
     } catch (error) {
       const latencyMs = Date.now() - start;
       const errMsg = error instanceof Error ? error.message : String(error);
-      logger.error({ walletId, asset, error: errMsg }, 'Close position failed');
-      return { success: false, error: errMsg, latencyMs };
+      const isNoLiquidity = errMsg.includes('could not immediately match against any resting orders');
+      if (isNoLiquidity) {
+        logger.warn({ walletId, asset, latencyMs }, 'No liquidity to close — order book empty (common on testnet)');
+      } else {
+        logger.error({ walletId, asset, error: errMsg }, 'Close position failed');
+      }
+      return {
+        success: false,
+        error: isNoLiquidity ? `No liquidity for ${asset} — order book empty (testnet?)` : errMsg,
+        latencyMs,
+      };
     }
   }
 

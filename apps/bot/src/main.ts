@@ -212,6 +212,15 @@ async function main() {
     {
       onHedgeOpened: (event) => eventBus.emit('hedge-opened', event),
       onHedgeClosed: (event) => eventBus.emit('hedge-closed', event),
+      onHedgeFailed: (event) => {
+        const isNoLiquidity = event.error.includes('No liquidity');
+        const emoji = isNoLiquidity ? '\u{26A0}\u{FE0F}' : '\u{274C}';
+        const label = isNoLiquidity ? 'Sin Liquidez' : 'Hedge FALLO';
+        alert(
+          webhookUrl,
+          `${emoji} <b>${label}</b>\n${event.side.toUpperCase()} ${event.size} ETH\nPool: <code>${event.poolConfigId.slice(0, 8)}</code>\n${event.error}`,
+        );
+      },
     },
     slRepo,
     circuitBreaker,

@@ -21,9 +21,18 @@ import type { CircuitBreaker } from './circuit-breaker.js';
 
 const logger = createLogger('engine');
 
+export interface HedgeFailedEvent {
+  poolConfigId: string;
+  side: string;
+  size: string;
+  error: string;
+  timestamp: number;
+}
+
 export interface HedgeEventCallbacks {
   onHedgeOpened?: (event: HedgeOpenedEvent) => void;
   onHedgeClosed?: (event: HedgeClosedEvent) => void;
+  onHedgeFailed?: (event: HedgeFailedEvent) => void;
 }
 
 /** Interface to close range trades when hedge takes priority */
@@ -145,6 +154,13 @@ export class HedgingEngine {
       this.circuitBreaker?.recordSuccess(config.id);
     } else {
       this.circuitBreaker?.recordFailure(config.id);
+      this.callbacks.onHedgeFailed?.({
+        poolConfigId: config.id,
+        side: params.side,
+        size: params.size,
+        error: result.protectionOrder.error ?? 'Unknown error',
+        timestamp: Date.now(),
+      });
     }
 
     // Record in DB + emit events + place backup SL

@@ -1,4 +1,4 @@
-export { HedgingEngine } from './engine.js';
+export { HedgingEngine, type HedgeFailedEvent } from './engine.js';
 export { CircuitBreaker } from './circuit-breaker.js';
 export { HyperliquidClient } from './hyperliquid-client.js';
 export { DryRunClient } from './dry-run-client.js';
