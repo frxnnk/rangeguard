@@ -46,13 +46,13 @@ async function main() {
   // --- Crash handlers (before anything else) ---
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'Uncaught exception');
-    alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot crashed: uncaughtException — ${err.message}`);
+    alert(process.env.ALERT_WEBHOOK_URL, `\u{1F480} <b>Bot CRASH</b>\nuncaughtException\n<code>${err.message}</code>`);
     setTimeout(() => process.exit(1), 2000); // give alert time to send
   });
   process.on('unhandledRejection', (reason) => {
     logger.fatal({ reason }, 'Unhandled rejection');
     const msg = reason instanceof Error ? reason.message : String(reason);
-    alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot crashed: unhandledRejection — ${msg}`);
+    alert(process.env.ALERT_WEBHOOK_URL, `\u{1F480} <b>Bot CRASH</b>\nunhandledRejection\n<code>${msg}</code>`);
     setTimeout(() => process.exit(1), 2000);
   });
 
@@ -141,13 +141,20 @@ async function main() {
   // 6. Initialize chain clients
   const chainClients = new ChainClientManager(config.rpc);
 
-  // Log WS connection status changes + alert on disconnect
+  // Log WS connection status changes + alert on disconnect (throttled)
+  const wsDisconnectAlerted = new Set<number>();
   chainClients.onWsStatusChange((chainId, status) => {
     if (status === 'connected') {
       logger.info({ chainId }, 'WebSocket connected');
+      wsDisconnectAlerted.delete(chainId);
+      alert(webhookUrl, `\u{2705} <b>WebSocket Reconectado</b>\nChain: ${chainId}`);
     } else if (status === 'disconnected') {
       logger.warn({ chainId }, 'WebSocket disconnected — falling back to polling');
-      alert(webhookUrl, `⚠️ Chain ${chainId} WebSocket disconnected — using HTTP polling fallback`);
+      // Only alert once per disconnect episode (not on every reconnect cycle)
+      if (!wsDisconnectAlerted.has(chainId)) {
+        wsDisconnectAlerted.add(chainId);
+        alert(webhookUrl, `\u{26A0}\u{FE0F} <b>WebSocket Desconectado</b>\nChain: ${chainId}\nUsando HTTP polling como fallback`);
+      }
     } else if (status === 'reconnecting') {
       logger.info({ chainId }, 'WebSocket reconnecting...');
     }
@@ -187,6 +194,12 @@ async function main() {
   const circuitBreaker = new CircuitBreaker({
     failureThreshold: config.monitoring.circuitBreakerThreshold,
     resetTimeoutMs: config.monitoring.circuitBreakerResetMs,
+    onOpen: (poolConfigId, failureCount) => {
+      alert(
+        webhookUrl,
+        `\u{1F6A8} <b>Circuit Breaker ABIERTO</b>\nPool: <code>${poolConfigId}</code>\nFallos consecutivos: ${failureCount}\nOperaciones pausadas por ${Math.round((config.monitoring.circuitBreakerResetMs ?? 300_000) / 60_000)} min`,
+      );
+    },
   });
 
   // Initialize hedging engine with event callbacks
@@ -305,7 +318,7 @@ async function main() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logger.error({ error, event }, 'Error handling range exit');
-        alert(webhookUrl, `🔴 Hedge open FAILED for pool ${event.poolConfigId}: ${msg}`);
+        alert(webhookUrl, `\u{274C} <b>Hedge FALLO al abrir</b>\nPool: <code>${event.poolConfigId}</code>\nError: ${msg}`);
       }
     });
   });
@@ -319,7 +332,7 @@ async function main() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         logger.error({ error, event }, 'Error handling range return');
-        alert(webhookUrl, `🔴 Hedge close FAILED for pool ${event.poolConfigId}: ${msg}`);
+        alert(webhookUrl, `\u{274C} <b>Hedge FALLO al cerrar</b>\nPool: <code>${event.poolConfigId}</code>\nError: ${msg}`);
       }
     });
   });
@@ -338,7 +351,7 @@ async function main() {
       );
       alert(
         webhookUrl,
-        `🟡 Hedge opened: ${event.side.toUpperCase()} ${event.size} @ $${event.entryPrice} (pool: ${event.poolConfigId}, wallet: ${event.walletType})`,
+        `\u{1F7E1} <b>Hedge Abierto</b>\n${event.side.toUpperCase()} ${event.size} @ $${parseFloat(event.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 2 })}\nPool: <code>${event.poolConfigId}</code>\nWallet: ${event.walletType}`,
       );
     } catch (error) {
       logger.error({ error }, 'Error in hedge-opened handler');
@@ -358,11 +371,11 @@ async function main() {
         'Hedge closed event',
       );
       const pnlNum = parseFloat(event.realizedPnl);
-      const emoji = pnlNum >= 0 ? '🟢' : '🔴';
+      const emoji = pnlNum >= 0 ? '\u{1F7E2}' : '\u{1F534}';
       const sign = pnlNum >= 0 ? '+' : '';
       alert(
         webhookUrl,
-        `${emoji} Hedge closed: PnL ${sign}$${pnlNum.toFixed(2)} (pool: ${event.poolConfigId}, reason: ${event.closeReason})`,
+        `${emoji} <b>Hedge Cerrado</b>\nPnL: <b>${sign}$${pnlNum.toFixed(2)}</b>\nPool: <code>${event.poolConfigId}</code>\nMotivo: ${event.closeReason}`,
       );
     } catch (error) {
       logger.error({ error }, 'Error in hedge-closed handler');
@@ -383,13 +396,13 @@ async function main() {
     );
     alert(
       webhookUrl,
-      `📈 Range trade opened: ${event.side.toUpperCase()} ${event.size} @ $${event.entryPrice} (pool: ${event.poolConfigId})`,
+      `\u{1F4C8} <b>Range Trade Abierto</b>\n${event.side.toUpperCase()} ${event.size} @ $${parseFloat(event.entryPrice).toLocaleString('en-US', { minimumFractionDigits: 2 })}\nPool: <code>${event.poolConfigId}</code>`,
     );
   });
 
   eventBus.on('range-trade-closed', (event) => {
     const pnlNum = parseFloat(event.realizedPnl);
-    const emoji = pnlNum >= 0 ? '🟢' : '🔴';
+    const emoji = pnlNum >= 0 ? '\u{1F7E2}' : '\u{1F534}';
     const sign = pnlNum >= 0 ? '+' : '';
     logger.info(
       {
@@ -402,7 +415,7 @@ async function main() {
     );
     alert(
       webhookUrl,
-      `${emoji} Range trade closed: PnL ${sign}$${pnlNum.toFixed(2)} (reason: ${event.closeReason})`,
+      `${emoji} <b>Range Trade Cerrado</b>\nPnL: <b>${sign}$${pnlNum.toFixed(2)}</b>\nPool: <code>${event.poolConfigId}</code>\nMotivo: ${event.closeReason}`,
     );
   });
 
@@ -433,7 +446,7 @@ async function main() {
       if (balance.isLow) {
         alert(
           webhookUrl,
-          `⚠️ Low balance: wallet "${wallet.alias}" has $${parseFloat(balance.available).toFixed(2)} (threshold: $${wallet.lowBalanceThreshold})`,
+          `\u{26A0}\u{FE0F} <b>Balance Bajo</b>\nWallet: <b>${wallet.alias}</b>\nDisponible: $${parseFloat(balance.available).toFixed(2)}\nUmbral: $${wallet.lowBalanceThreshold}`,
         );
       }
     },
@@ -449,7 +462,7 @@ async function main() {
         );
         alert(
           webhookUrl,
-          `💀 LIQUIDATED: ${event.asset} hedge ${hedge.id} on wallet ${event.walletId} — position no longer exists on HL`,
+          `\u{1F480} <b>LIQUIDACION</b>\nActivo: ${event.asset}\nHedge: <code>${hedge.id}</code>\nWallet: <code>${event.walletId}</code>\nLa posicion ya no existe en Hyperliquid`,
         );
       }
     },
@@ -604,13 +617,58 @@ async function main() {
     5 * 60 * 1000,
   ); // every 5 minutes
 
-  alert(webhookUrl, `⚡ Bot started — monitoring ${watchedPoolIds.size} pool(s)`);
+  // 18. Daily summary — sends PnL report to Telegram every 24h at midnight UTC
+  const sendDailySummary = () => {
+    try {
+      const since = Date.now() - 24 * 60 * 60 * 1000;
+      const hedgeStats = hedgesRepo.statsSince(since);
+      const rangeStats = rangeTradesRepo.statsSince(since);
+      const openHedges = hedgesRepo.findOpen().length;
+      const openRangeTrades = rangeTradesRepo.findOpen().length;
+      const totalPnl = hedgeStats.totalPnl + rangeStats.totalPnl;
+      const totalTrades = hedgeStats.totalTrades + rangeStats.totalTrades;
+      const pnlEmoji = totalPnl >= 0 ? '\u{1F7E2}' : '\u{1F534}';
+      const sign = totalPnl >= 0 ? '+' : '';
+
+      const lines = [
+        `\u{1F4CA} <b>Resumen Diario</b>`,
+        ``,
+        `<b>Hedges:</b> ${hedgeStats.totalTrades} trades | PnL: ${hedgeStats.totalPnl >= 0 ? '+' : ''}$${hedgeStats.totalPnl.toFixed(2)} | W/L: ${hedgeStats.wins}/${hedgeStats.losses}`,
+        `<b>Range Trades:</b> ${rangeStats.totalTrades} trades | PnL: ${rangeStats.totalPnl >= 0 ? '+' : ''}$${rangeStats.totalPnl.toFixed(2)} | W/L: ${rangeStats.wins}/${rangeStats.losses}`,
+        ``,
+        `${pnlEmoji} <b>PnL Total (24h):</b> ${sign}$${totalPnl.toFixed(2)}`,
+        `\u{1F4C8} <b>Trades cerrados:</b> ${totalTrades}`,
+        `\u{1F4C2} <b>Posiciones abiertas:</b> ${openHedges} hedges, ${openRangeTrades} range trades`,
+        `\u{1F4BB} <b>Pools activos:</b> ${watchedPoolIds.size}`,
+      ];
+
+      alert(webhookUrl, lines.join('\n'));
+      logger.info({ hedgeStats, rangeStats }, 'Daily summary sent');
+    } catch (error) {
+      logger.warn({ error }, 'Failed to send daily summary');
+    }
+  };
+
+  // Schedule first run at next midnight UTC, then every 24h
+  const msUntilMidnight = (() => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setUTCHours(24, 0, 0, 0);
+    return midnight.getTime() - now.getTime();
+  })();
+  const dailySummaryTimeout = setTimeout(() => {
+    sendDailySummary();
+    dailySummaryInterval = setInterval(sendDailySummary, 24 * 60 * 60 * 1000);
+  }, msUntilMidnight);
+  let dailySummaryInterval: ReturnType<typeof setInterval> | undefined;
+
+  alert(webhookUrl, `\u{26A1} <b>Bot Iniciado</b>\nPools activos: ${watchedPoolIds.size}\nEntorno: ${config.env}`);
   logger.info('Bot is running. Press Ctrl+C to stop.');
 
   // Graceful shutdown
   const shutdown = async () => {
     logger.info('Shutting down...');
-    alert(webhookUrl, '⛔ Bot shutting down');
+    alert(webhookUrl, '\u{26D4} <b>Bot Detenido</b>');
 
     // Force exit after 30s if cleanup hangs
     const forceTimer = setTimeout(() => {
@@ -622,6 +680,8 @@ async function main() {
     clearInterval(heartbeatInterval);
     clearInterval(cleanupInterval);
     clearInterval(lpSyncInterval);
+    clearTimeout(dailySummaryTimeout);
+    if (dailySummaryInterval) clearInterval(dailySummaryInterval);
     walletMonitor.stop();
     poolWatcher.unwatchAll();
     eventBus.removeAllListeners();
@@ -643,6 +703,6 @@ async function main() {
 
 main().catch((error) => {
   logger.fatal({ error }, 'Fatal error');
-  alert(process.env.ALERT_WEBHOOK_URL, `💀 Bot fatal error: ${error.message || error}`);
+  alert(process.env.ALERT_WEBHOOK_URL, `\u{1F480} <b>Error Fatal</b>\n<code>${error.message || error}</code>`);
   setTimeout(() => process.exit(1), 2000);
 });
