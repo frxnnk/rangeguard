@@ -328,29 +328,45 @@ export class HyperliquidClient {
     const state = await publicClient.clearinghouseState({ user: client.address as `0x${string}` });
 
     const crossMarginSummary = state.crossMarginSummary;
-    let accountValue = parseFloat(crossMarginSummary.accountValue ?? '0');
+    const perpsAccountValue = parseFloat(crossMarginSummary.accountValue ?? '0');
     const marginUsed = parseFloat(crossMarginSummary.totalMarginUsed ?? '0');
 
-    // On unified accounts (testnet), funds may be in spot — check spotClearinghouseState too
-    if (accountValue === 0) {
-      try {
-        const spotState = await publicClient.spotClearinghouseState({
-          user: client.address as `0x${string}`,
-        });
-        const usdcBalance = spotState.balances?.find((b) => b.coin === 'USDC');
-        if (usdcBalance) {
-          accountValue = parseFloat(usdcBalance.total ?? '0');
-        }
-      } catch {
-        // spotClearinghouseState may not be available on all versions
+    // Unified accounts (testnet): spot USDC is shared as perp margin.
+    // Always check spot to get the true available balance.
+    let spotAvailable = 0;
+    let spotTotal = 0;
+    try {
+      const spotState = await publicClient.spotClearinghouseState({
+        user: client.address as `0x${string}`,
+      });
+      const usdcBalance = spotState.balances?.find((b) => b.coin === 'USDC');
+      if (usdcBalance) {
+        spotTotal = parseFloat(usdcBalance.total ?? '0');
       }
+      // HL provides pre-calculated available after maintenance margin
+      const availEntry = (spotState as unknown as Record<string, unknown>)
+        .tokenToAvailableAfterMaintenance;
+      if (Array.isArray(availEntry)) {
+        const usdcEntry = availEntry.find(
+          (e: unknown) => Array.isArray(e) && e[0] === 0,
+        );
+        if (usdcEntry) {
+          spotAvailable = parseFloat(String(usdcEntry[1]));
+        }
+      }
+    } catch {
+      // spotClearinghouseState may not be available on all versions
     }
 
-    const available = Math.max(0, accountValue - marginUsed);
+    // Use the higher of: perps-only available, or spot available (for unified accounts)
+    const perpsAvailable = Math.max(0, perpsAccountValue - marginUsed);
+    const available = Math.max(perpsAvailable, spotAvailable);
+    const total = Math.max(perpsAccountValue, spotTotal);
+
     return {
       available: available.toString(),
       marginUsed: crossMarginSummary.totalMarginUsed ?? '0',
-      total: accountValue.toString(),
+      total: total.toString(),
     };
   }
 
