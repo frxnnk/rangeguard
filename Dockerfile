@@ -52,9 +52,8 @@ CMD ["pnpm", "--filter", "@rangeguard/dashboard", "start"]
 FROM deps AS combined
 COPY . .
 COPY --from=dashboard-build /app/packages/dashboard/.next ./packages/dashboard/.next
-RUN mkdir -p /app/data && chown botuser:botuser /app/data
-RUN mkdir -p /home/botuser/.rangeguard && chown botuser:botuser /home/botuser/.rangeguard
+RUN mkdir -p /app/data /home/botuser/.rangeguard && chown -R botuser:botuser /app/data /home/botuser/.rangeguard
 ENV NODE_ENV=production
-USER botuser
 EXPOSE 3000
+# Run as root so Railway volume mounts are writable, then startup script handles the rest
 CMD ["bash", "scripts/start-railway.sh"]

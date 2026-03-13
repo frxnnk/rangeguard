@@ -4,11 +4,16 @@ set -e
 ENV="${RANGEGUARD_ENV:-testnet}"
 DB_FILE="/app/data/bot-${ENV}.db"
 
-# Bootstrap vault from WALLET_KEYS env var (if set and vault doesn't exist yet)
+# Ensure data + vault dirs exist and are writable (Railway volumes mount as root)
+mkdir -p /app/data /home/botuser/.rangeguard 2>/dev/null || true
+
+# Bootstrap vault from WALLET_KEYS env var
+# Always re-bootstrap if DB doesn't exist (fresh deploy) or vault is missing
 if [ -n "$WALLET_KEYS" ]; then
   VAULT_FILE="${VAULT_PATH:-$HOME/.rangeguard/vault-${ENV}.enc}"
-  if [ ! -f "$VAULT_FILE" ]; then
+  if [ ! -f "$VAULT_FILE" ] || [ ! -f "$DB_FILE" ]; then
     echo "WALLET_KEYS detected — bootstrapping vault..."
+    rm -f "$VAULT_FILE" 2>/dev/null || true
     node --no-warnings --import tsx scripts/bootstrap-vault.ts
   else
     echo "Vault already exists — skipping bootstrap"
