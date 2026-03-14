@@ -28,24 +28,6 @@ const DOC_REGISTRY: DocMeta[] = [
     category: 'tecnico',
     description: 'Optimizaciones de latencia, caché y paralelización',
   },
-  {
-    slug: 'PRODUCTION_READINESS',
-    title: 'Producción',
-    category: 'operativo',
-    description: 'Checklist y pasos para pasar de testnet a mainnet',
-  },
-  {
-    slug: 'TESTNET_GUIDE',
-    title: 'Guía Testnet',
-    category: 'operativo',
-    description: 'Paso a paso para testing en Hyperliquid testnet',
-  },
-  {
-    slug: 'RAILWAY_DEPLOY',
-    title: 'Deploy en Railway',
-    category: 'operativo',
-    description: 'Configuración de Railway, variables de entorno y volúmenes',
-  },
 ];
 
 function getDocsDir(): string {
