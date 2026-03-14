@@ -96,7 +96,7 @@ export class ChainClientManager {
       const chain = VIEM_CHAINS[chainId];
       const newWsClient = createPublicClient({
         chain,
-        transport: webSocket(pair.wsUrl, { keepAlive: true, reconnect: false }),
+        transport: webSocket(pair.wsUrl, { keepAlive: true, reconnect: { delay: 2_000 } }),
       }) as PublicClient;
 
       // Test the connection with a simple call
@@ -198,7 +198,7 @@ export class ChainClientManager {
       try {
         wsClient = createPublicClient({
           chain,
-          transport: webSocket(wsUrl, { keepAlive: true, reconnect: false }),
+          transport: webSocket(wsUrl, { keepAlive: true, reconnect: { delay: 2_000 } }),
         }) as PublicClient;
         wsStatus = 'connected';
         logger.info({ chainId, wsUrl }, 'WebSocket client created');
