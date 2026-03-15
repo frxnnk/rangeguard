@@ -17,5 +17,9 @@ export const HL_ASSETS: Record<string, number> = {
   MATIC: 15,
 };
 
-export const HL_SLIPPAGE_BPS = 100; // 1% slippage for IOC market orders
+// Slippage for IOC market orders — override with HL_SLIPPAGE_BPS env var
+// Default: 100 bps (1%) for mainnet, 500 bps (5%) for testnet (price divergence)
+const envSlippage = process.env.HL_SLIPPAGE_BPS ? parseInt(process.env.HL_SLIPPAGE_BPS, 10) : undefined;
+const isTestnet = process.env.HL_API_URL?.includes('testnet') ?? false;
+export const HL_SLIPPAGE_BPS = envSlippage ?? (isTestnet ? 500 : 100);
 export const HL_MAX_LEVERAGE = 50;
