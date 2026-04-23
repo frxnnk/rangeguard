@@ -1,9 +1,9 @@
-# RangeGuard
+﻿# RangeGuard
 
 [![CI](https://github.com/frxnnk/rangeguard/actions/workflows/ci.yml/badge.svg)](https://github.com/frxnnk/rangeguard/actions/workflows/ci.yml)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue)
 ![Node.js](https://img.shields.io/badge/Node.js-22+-green)
-![License](https://img.shields.io/badge/License-Proprietary-red)
+![License](https://img.shields.io/badge/License-MIT-blue)
 ![Tests](https://img.shields.io/badge/Tests-78%20passing-brightgreen)
 
 Bot de cobertura automatizada contra **Impermanent Loss** en pools de liquidez concentrada (Uniswap V3). Cuando el precio sale del rango configurado, el bot abre posiciones de hedge en **Hyperliquid DEX** (perpetuos) para compensar la perdida. Cuando vuelve al rango, cierra las posiciones automaticamente.
@@ -851,3 +851,4 @@ pnpm install
 | CI/CD            | GitHub Actions                       |
 | Containerizacion | Docker multi-stage                   |
 | CLI              | @inquirer/prompts                    |
+
